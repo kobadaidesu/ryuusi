@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>パラメーター詳細 — Particle Flow</title>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    /* ---- Details ページ固有スタイル ---- */
+    .detail-hero {
+      padding: 5rem 1.5rem 3rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    @media (min-width: 640px)  { .detail-hero { padding: 6rem 2.5rem 3.5rem; } }
+    @media (min-width: 1024px) { .detail-hero { padding: 8rem 5rem 4rem; } }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      text-decoration: none;
+      letter-spacing: 0.05em;
+      margin-bottom: 2.5rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: #1a1a1a; }
+
+    .detail-hero h1 {
+      font-size: clamp(2.2rem, 7vw, 5rem);
+      font-weight: 300;
+      line-height: 1.0;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+
+    .detail-hero p {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: #6b7280;
+      max-width: 40rem;
+    }
+
+    /* ---- セクション ---- */
+    .detail-section {
+      padding: 3.5rem 1.5rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    @media (min-width: 640px)  { .detail-section { padding: 4rem 2.5rem; } }
+    @media (min-width: 1024px) { .detail-section { padding: 5rem 5rem; } }
+
+    .detail-section-inner {
+      max-width: 80rem;
+      margin: 0 auto;
+    }
+
+    .section-heading {
+      font-size: clamp(1.1rem, 3vw, 1.5rem);
+      font-weight: 400;
+      margin-bottom: 1.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .section-emoji {
+      font-size: 1.1em;
+      line-height: 1;
+    }
+
+    /* ---- テーブル ---- */
+    .param-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: clamp(0.85rem, 1.5vw, 0.95rem);
+    }
+
+    .param-table thead tr {
+      border-bottom: 2px solid #1a1a1a;
+    }
+
+    .param-table th {
+      text-align: left;
+      font-weight: 500;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #9ca3af;
+      padding: 0 0 0.75rem;
+    }
+    .param-table th:not(:first-child) { padding-left: 1.5rem; }
+
+    .param-table tbody tr {
+      border-bottom: 1px solid #f3f4f6;
+      transition: background 0.15s;
+    }
+    .param-table tbody tr:last-child { border-bottom: none; }
+    .param-table tbody tr:hover { background: #f9fafb; }
+
+    .param-table td {
+      padding: 0.9rem 0;
+      vertical-align: top;
+      line-height: 1.6;
+      color: #374151;
+    }
+    .param-table td:not(:first-child) { padding-left: 1.5rem; }
+
+    .param-name {
+      font-family: 'SFMono-Regular', 'Consolas', monospace;
+      font-size: 0.85em;
+      color: #1a1a1a;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    .param-op {
+      white-space: nowrap;
+      color: #6b7280;
+      font-size: 0.85em;
+    }
+
+    /* モバイル: テーブルをカード形式に */
+    @media (max-width: 639px) {
+      .param-table thead { display: none; }
+
+      .param-table tbody tr {
+        display: block;
+        padding: 1rem 0;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .param-table td {
+        display: block;
+        padding: 0.15rem 0;
+      }
+      .param-table td:not(:first-child) { padding-left: 0; }
+
+      .param-table td[data-label]::before {
+        content: attr(data-label);
+        display: inline;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9ca3af;
+        margin-right: 0.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <div class="detail-hero">
+    <div style="max-width:80rem;margin:0 auto">
+      <a href="/" class="back-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        もどる
+      </a>
+      <h1>パラメーター詳細</h1>
+      <p>Tab キーを押して設定パネルを開き、各項目を調整できます。</p>
+    </div>
+  </div>
+
+  <!-- Color Presets -->
+  <section class="detail-section">
+    <div class="detail-section-inner reveal">
+      <h2 class="section-heading">
+        <span class="section-emoji">🎨</span> Color Presets（色）
+      </h2>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>パラメーター</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">Hue min / max</span></td>
+            <td data-label="内容">粒子の色相範囲（0〜1 = 虹の全域）。min=max で単色、範囲を広げるとグラデーション。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">プリセットボタン群</span></td>
+            <td data-label="内容">Fire / Gold / Aurora / Rainbow など 16 種の色を即適用。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Recolor now</span></td>
+            <td data-label="内容">既存粒子の色を現在の色相設定で塗り直す。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Sim Area -->
+  <section class="detail-section">
+    <div class="detail-section-inner reveal">
+      <h2 class="section-heading">
+        <span class="section-emoji">📐</span> Sim Area（壁・プレイエリア）
+      </h2>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>パラメーター</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">Width / Height px</span></td>
+            <td data-label="内容">粒子が跳ね返る壁の範囲。0 = ウィンドウ全体（壁なし）。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Bounce</span></td>
+            <td data-label="内容">壁に当たったときの反発係数。0 = 吸収、1 = 完全反射。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Attract / Repel -->
+  <section class="detail-section" style="background:#fafaf9">
+    <div class="detail-section-inner reveal">
+      <h2 class="section-heading">
+        <span class="section-emoji">🧲</span> Attract / Repel（引力・斥力）
+      </h2>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>パラメーター</th>
+            <th>操作</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">Attract str</span></td>
+            <td><span class="param-op">左クリック</span></td>
+            <td data-label="内容">引力の強さ。大きいほど強く引き寄せる。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Attract range</span></td>
+            <td><span class="param-op">左クリック</span></td>
+            <td data-label="内容">引力の有効距離（px）。0 = 無制限。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Repel str</span></td>
+            <td><span class="param-op">右クリック</span></td>
+            <td data-label="内容">斥力の強さ。大きいほど強く弾く。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Passive attract</span></td>
+            <td><span class="param-op">常時</span></td>
+            <td data-label="内容">マウスカーソルへの常時引力。0 で無効。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Gather speed</span></td>
+            <td><span class="param-op">G キー</span></td>
+            <td data-label="内容">G キー押し中の収束速度。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Time Stop -->
+  <section class="detail-section">
+    <div class="detail-section-inner reveal">
+      <h2 class="section-heading">
+        <span class="section-emoji">⏸</span> Time Stop（T キー）
+      </h2>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>パラメーター</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">TS Attract</span></td>
+            <td data-label="内容">タイムストップ中にカーソルへ引き寄せる力。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">TS Damping</span></td>
+            <td data-label="内容">タイムストップ中の速度減衰率。小さいほど急激に止まる（0.1〜0.99）。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Vortex / Explode -->
+  <section class="detail-section" style="background:#fafaf9">
+    <div class="detail-section-inner reveal">
+      <h2 class="section-heading">
+        <span class="section-emoji">🌀</span> Vortex / Explode（V・E キー）
+      </h2>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>パラメーター</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">Vortex str</span></td>
+            <td data-label="内容">渦の回転力。大きいほど速く渦巻く。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Vortex cap</span></td>
+            <td data-label="内容">渦の力の上限。大きすぎると粒子が飛散するのを防ぐ。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Explode str</span></td>
+            <td data-label="内容">爆発の押し出し力。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Explode cap</span></td>
+            <td data-label="内容">爆発力の上限。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Ripple -->
+  <section class="detail-section" style="background:#fafaf9">
+    <div class="detail-section-inner reveal">
+      <h2 class="section-heading">
+        <span class="section-emoji">🔵</span> Ripple（B キー）
+      </h2>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>パラメーター</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">Ripple str</span></td>
+            <td data-label="内容">波紋が粒子を弾く衝撃力。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Physics -->
+  <section class="detail-section">
+    <div class="detail-section-inner reveal">
+      <h2 class="section-heading">
+        <span class="section-emoji">⚙️</span> Physics（物理全般）
+      </h2>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>パラメーター</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">Gravity</span></td>
+            <td data-label="内容">重力（下向き）。正 = 落下、負 = 浮上、0 = 無重力。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Damping</span></td>
+            <td data-label="内容">速度の減衰率（毎フレーム）。0.999 = ほぼ減衰なし、0.90 = すぐ止まる。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Speed limit</span></td>
+            <td data-label="内容">粒子の最大速度（px/秒）。上限を下げると動きが穏やかになる。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Bounce</span></td>
+            <td data-label="内容">壁反発係数（Sim Area と共通）。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Particles -->
+  <section class="detail-section" style="background:#fafaf9">
+    <div class="detail-section-inner reveal">
+      <h2 class="section-heading">
+        <span class="section-emoji">🔴</span> Particle of number（粒子数・サイズ）
+      </h2>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>パラメーター</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">Count</span></td>
+            <td data-label="内容">表示する粒子の上限数（最大 300,000）。</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">Point size</span></td>
+            <td data-label="内容">粒子 1 個の描画サイズ（px）。大きくすると粒が目立つ。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <p>© 2026 Particle Flow</p>
+      <a href="/" style="font-size:0.8rem;color:#9ca3af;text-decoration:none">← トップに戻る</a>
+    </div>
+  </footer>
+
+  <script src="../script.js"></script>
+</body>
+</html>

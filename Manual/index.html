@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Particle Flow</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ======== Hero ======== -->
+  <section class="hero">
+    <div class="hero-bg">
+      <img src="hero.png" alt="Particle Flow" />
+    </div>
+
+    <div class="hero-title">
+      <h1><span class="h1-particle">Particle</span><span class="h1-flow">Flow</span></h1>
+    </div>
+
+    <button class="scroll-indicator" onclick="scrollToContent()" aria-label="スクロール">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+           stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </button>
+  </section>
+
+  <div class="content">
+
+    <!-- ======== About ======== -->
+    <section>
+      <div class="max-w">
+        <div class="about-grid">
+          <div class="about-label reveal-fade">
+            <p class="label">About</p>
+          </div>
+          <div class="reveal">
+            <h2 class="heading-xl">
+              マウスとキーボードで<br />
+              粒子をリアルタイムに操作
+            </h2>
+            <p class="text-body">
+              最大30万個の粒子が生み出す視覚的な変化を楽しめるインタラクティブビジュアル作品です。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== Dark: description ======== -->
+    <section class="dark-section">
+      <div class="max-w">
+        <div class="dark-inner reveal">
+          <h2 class="heading-xl">
+            予測しきれない<br />
+            動きと模様
+          </h2>
+          <p class="dark-text">
+            渦・波紋・引力などを組み合わせることで、予測しきれない動きや模様が生まれます。パラメータを調整することで、変化の強さや印象も大きく変わり、自分だけのデジタルアートを見つける感覚を楽しめます。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== Operations ======== -->
+    <section>
+      <div class="max-w">
+        <div class="ops-header reveal-fade">
+          <span class="label">Operations</span>
+          <h2 class="heading-xl">
+            粒子を操作する<br />
+            主な５つの方法
+          </h2>
+        </div>
+
+        <div>
+          <div class="op-card reveal">
+            <div class="op-card-inner">
+              <div class="op-header-row">
+                <span class="op-num">01</span>
+                <div class="op-title-wrap">
+                  <h3 class="op-title">引力</h3>
+                  <span class="op-key">左クリック</span>
+                </div>
+              </div>
+              <div class="op-desc-row">
+                <p class="op-desc">カーソルに向かって粒子が引き寄せられる操作です。周囲の粒子が吸い込まれるように集まり、流れにまとまりが生まれます。</p>
+                <video class="op-video" src="images/inryoku3.mp4" autoplay loop muted playsinline></video>
+              </div>
+            </div>
+          </div>
+          <div class="op-card reveal">
+            <div class="op-card-inner">
+              <div class="op-header-row">
+                <span class="op-num">02</span>
+                <div class="op-title-wrap">
+                  <h3 class="op-title">渦</h3>
+                  <span class="op-key">V キー</span>
+                </div>
+              </div>
+              <div class="op-desc-row">
+                <p class="op-desc">カーソル周辺に渦のような回転を生み出す操作です。粒子を巻き込みながら流れを変化させ、複雑なうねりを作り出します。</p>
+                <video class="op-video" src="images/uzu2.mp4" autoplay loop muted playsinline></video>
+              </div>
+            </div>
+          </div>
+          <div class="op-card reveal">
+            <div class="op-card-inner">
+              <div class="op-header-row">
+                <span class="op-num">03</span>
+                <div class="op-title-wrap">
+                  <h3 class="op-title">タイムストップ</h3>
+                  <span class="op-key">T キー</span>
+                </div>
+              </div>
+              <div class="op-desc-row">
+                <p class="op-desc">粒子を急激に減速させる操作です。動いていた粒子が一気に静まり、時間が止まったような印象的な変化を生み出します。</p>
+                <video class="op-video" src="images/time_stop.mp4" autoplay loop muted playsinline></video>
+              </div>
+            </div>
+          </div>
+          <div class="op-card reveal">
+            <div class="op-card-inner">
+              <div class="op-header-row">
+                <span class="op-num">04</span>
+                <div class="op-title-wrap">
+                  <h3 class="op-title">波紋発生</h3>
+                  <span class="op-key">B キー</span>
+                </div>
+              </div>
+              <div class="op-desc-row">
+                <p class="op-desc">一点から衝撃波のような広がりを生み出す操作です。中心から外側へ向かって粒子が押し広げられ、波のような動きが発生します。</p>
+                <video class="op-video" src="images/hamon.mp4" autoplay loop muted playsinline></video>
+              </div>
+            </div>
+          </div>
+          <div class="op-card reveal">
+            <div class="op-card-inner">
+              <div class="op-header-row">
+                <span class="op-num">05</span>
+                <div class="op-title-wrap">
+                  <h3 class="op-title">収束</h3>
+                  <span class="op-key">G キー</span>
+                </div>
+              </div>
+              <div class="op-desc-row">
+                <p class="op-desc">画面上の粒子を一気に集める操作です。散らばっていた粒子がまとまり、密度の高いダイナミックな変化を楽しめます。</p>
+                <video class="op-video" src="images/convergence.mp4" autoplay loop muted playsinline></video>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="ops-note">※見やすいようにパラメーターを一部設定しています</p>
+        <div class="ops-other">
+          <p class="ops-other-label">その他の操作</p>
+          <div class="ops-other-list">
+            <span class="ops-other-item"><span class="ops-other-key">R</span>再スタート</span>
+            <span class="ops-other-item"><span class="ops-other-key">E</span>爆発</span>
+            <span class="ops-other-item"><span class="ops-other-key">Tab</span>パラメータ設定画面</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== Parameters ======== -->
+    <section class="params-section">
+      <div class="max-w">
+        <div class="params-grid">
+          <div class="reveal">
+            <span class="label params-label">Parameters</span>
+            <h2 class="params-heading">詳細設定</h2>
+            <p class="params-desc">強弱、範囲、速度などのパラメータを調整できます。</p>
+          </div>
+          <div class="reveal">
+            <div class="param-items">
+              <div class="param-item">
+                <h3>粒子の大きさ</h3>
+                <p>細かすぎるなと感じたときに使ってください。</p>
+                <img src="images/size.png" alt="粒子の大きさ設定" class="param-img" />
+              </div>
+              <div class="param-item">
+                <h3>粒子の数</h3>
+                <p>多すぎて見づらいときに使ってください。</p>
+                <img src="images/num.png" alt="粒子の数設定" class="param-img" />
+              </div>
+              <div class="param-item">
+                <h3>色の変更</h3>
+                <p>好きな色に変えてみてください！</p>
+                <img src="images/color.png" alt="色の変更設定" class="param-img" />
+              </div>
+              <a href="/details/" class="params-note params-note-link">さらに細かい設定もできます →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== Recommendations ======== -->
+    <section>
+      <div class="max-w">
+        <div class="rec-header reveal-fade">
+          <span class="label">Recommendations</span>
+          <h2 class="heading-xl" style="margin-top:1rem">おすすめの遊び方</h2>
+        </div>
+        <div class="rec-grid">
+          <div class="reveal">
+            <div class="rec-card">
+              <div class="rec-num">01</div>
+              <h3 class="rec-title">渦で巻き込み、集める</h3>
+              <p class="rec-subtitle">V ずっと長押し ⇒ G 押 ⇒ G 離</p>
+              <p class="rec-desc">渦を発生させたあとに粒子を集めると、流れが大きく変化します。参考映像を見ながら試してみてください。</p>
+            </div>
+          </div>
+          <div class="reveal">
+            <div class="rec-card">
+              <div class="rec-num">02</div>
+              <h3 class="rec-title">一瞬の変化を楽しむ</h3>
+              <p class="rec-subtitle">G を一瞬押して、E を長押し</p>
+              <p class="rec-desc">粒子の動きに大きな変化が生まれます。短い操作でも印象が大きく変わるのが特徴です。<br />Gを押す長さによって見れるものが変わるかも、、、？ぎりぎりまでGを押して開放してみよう！</p>
+            </div>
+          </div>
+          <div class="reveal">
+            <div class="rec-card">
+              <div class="rec-num">03</div>
+              <h3 class="rec-title">線のような表現を作る</h3>
+              <p class="rec-subtitle">G を長押し後にカーソルを動かす</p>
+              <p class="rec-desc">線のような軌跡が現れます。その線に対して左クリックすると、また違った変化を楽しめます。</p>
+            </div>
+          </div>
+          <div class="reveal">
+            <div class="rec-card">
+              <div class="rec-num">04</div>
+              <h3 class="rec-title">パラメータを変えてみる</h3>
+              <p class="rec-subtitle">speed limit を 200px/s に変更</p>
+              <p class="rec-desc">params を開き、Physics → speed limit を 200px/s に変更して１，２，３をもう一度試してみてください。同じ操作でも、まったく違う光景が見えてくると思います。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== Final ======== -->
+    <section class="dark-section">
+      <div class="max-w">
+        <div class="final-wrap reveal">
+          <h2 class="final-heading">
+            自分だけの動きや<br />
+            表現を見つけてみてください
+          </h2>
+          <p class="final-text">
+            パラメータを1つ変えたり、ボタンの押す長さやタイミングで見える景色は大きく変わります。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== Footer ======== -->
+    <footer>
+      <div class="footer-inner">
+        <p>© 2026 Particle Flow</p>
+        <p>Designed with intention</p>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Lightbox -->
+  <div id="lightbox" role="dialog" aria-modal="true">
+    <div class="lightbox-bg"></div>
+    <button id="lightbox-close" onclick="closeLightbox()" aria-label="閉じる">✕</button>
+    <img id="lightbox-img" src="" alt="" />
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

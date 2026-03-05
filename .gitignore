@@ -1,0 +1,12 @@
+# ビルド成果物
+bin/
+obj/
+
+# ImGui 自動生成
+imgui.ini
+
+# メモ
+111.txt
+
+# 別リポジトリ
+Enhancedesigneraesthetics/
