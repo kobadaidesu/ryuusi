@@ -494,6 +494,12 @@ section {
 @media (min-width: 640px) { .rec-num { margin-bottom: 2rem; } }
 .rec-card:hover .rec-num { color: #9ca3af; }
 
+.rec-video {
+  width: 100%;
+  margin-top: 1.5rem;
+  border-radius: 4px;
+}
+
 .rec-title {
   font-size: clamp(1.1rem, 2.5vw, 1.75rem);
   font-weight: 300;
