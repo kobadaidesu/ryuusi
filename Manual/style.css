@@ -479,6 +479,8 @@ section {
   padding: 1.75rem;
   transition: border-color 0.3s;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 @media (min-width: 640px) { .rec-card { padding: 2.5rem; } }
 .rec-card:hover { border-color: #9ca3af; }
@@ -496,7 +498,8 @@ section {
 
 .rec-video {
   width: 100%;
-  margin-top: 1.5rem;
+  margin-top: auto;
+  padding-top: 1.5rem;
   border-radius: 4px;
 }
 
@@ -573,6 +576,80 @@ footer {
 }
 
 .footer-inner p { font-size: 0.8rem; color: #9ca3af; }
+
+/* ================================================================
+   Language switcher
+================================================================ */
+.lang-switcher {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 100;
+  display: flex;
+  gap: 0.15rem;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 999px;
+  padding: 0.35rem 0.5rem;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.lang-btn {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: none;
+  background: none;
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.lang-btn:hover { color: #1a1a1a; }
+.lang-btn.active { background: #1a1a1a; color: #fff; }
+
+/* ================================================================
+   Back to top button
+================================================================ */
+#back-to-top {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 100;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  border: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 0.3s, transform 0.3s, color 0.2s, border-color 0.2s;
+}
+
+#back-to-top.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+#back-to-top:hover {
+  color: #1a1a1a;
+  border-color: #9ca3af;
+}
 
 /* ================================================================
    Scroll animation
