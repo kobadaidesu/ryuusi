@@ -10,7 +10,11 @@
 
 #include "render.h"
 #include "sim_params.h"
-#include <GL/glew.h>
+#ifdef __EMSCRIPTEN__
+#  include <GLES3/gl3.h>
+#else
+#  include <GL/glew.h>
+#endif
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +24,12 @@
 /*  GLSL シェーダソース (文字列埋め込み)                                 */
 /* ------------------------------------------------------------------ */
 static const char *VERT_SRC =
+#ifdef __EMSCRIPTEN__
+    "#version 300 es\n"
+    "precision highp float;\n"
+#else
     "#version 330 core\n"
+#endif
     "layout(location = 0) in vec2  a_pos;\n"
     "layout(location = 1) in vec4  a_color;\n"
     "uniform vec2  u_resolution;\n"
@@ -35,7 +44,12 @@ static const char *VERT_SRC =
     "}\n";
 
 static const char *FRAG_SRC =
+#ifdef __EMSCRIPTEN__
+    "#version 300 es\n"
+    "precision mediump float;\n"
+#else
     "#version 330 core\n"
+#endif
     "in  vec4 v_color;\n"
     "out vec4 frag_color;\n"
     "void main() {\n"
@@ -111,13 +125,14 @@ static GLuint create_program(void)
 /* ------------------------------------------------------------------ */
 Renderer *render_init(int win_w, int win_h)
 {
-    /* GLEW 初期化 */
+#ifndef __EMSCRIPTEN__
     glewExperimental = GL_TRUE;
     GLenum err = glewInit();
     if (err != GLEW_OK) {
         fprintf(stderr, "[render] glewInit: %s\n", glewGetErrorString(err));
         return NULL;
     }
+#endif
 
     Renderer *r = (Renderer*)calloc(1, sizeof(Renderer));
     if (!r) return NULL;
@@ -168,8 +183,9 @@ Renderer *render_init(int win_w, int win_h)
     }
 
     /* ---- OpenGL 基本設定 ---- */
-    glEnable(GL_VERTEX_PROGRAM_POINT_SIZE); /* gl_PointSize をシェーダで制御 */
-    glEnable(GL_POINT_SMOOTH);              /* (compatibility 用フォールバック) */
+#ifndef __EMSCRIPTEN__
+    glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+#endif
 
     /* 加算合成: 重なるほど明るく = 発光エフェクト */
     glEnable(GL_BLEND);

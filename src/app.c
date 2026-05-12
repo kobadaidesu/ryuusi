@@ -16,7 +16,12 @@
 #include "gui.h"
 #include "sim_params.h"
 
-#include <GL/glew.h>
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+#  include <GLES3/gl3.h>
+#else
+#  include <GL/glew.h>
+#endif
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,10 +73,17 @@ int app_init(void)
         return -1;
     }
 
+#ifdef __EMSCRIPTEN__
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+                        SDL_GL_CONTEXT_PROFILE_ES);
+#else
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
                         SDL_GL_CONTEXT_PROFILE_CORE);
+#endif
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 
@@ -116,132 +128,138 @@ int app_init(void)
 }
 
 /* ------------------------------------------------------------------ */
+/*  メインループ状態 (Emscripten コールバックで共有)                    */
+/* ------------------------------------------------------------------ */
+static Uint64 g_freq;
+static Uint64 g_prev;
+static float  g_fps        = 0.0f;
+static int    g_frame_count = 0;
+static Uint64 g_fps_timer;
+
+static void main_loop_iter(void)
+{
+    gui_new_frame();
+
+    input_process_ex(&g_input,
+                     gui_wants_mouse(),
+                     gui_wants_keyboard());
+
+    if (g_input.do_toggle_gui)    g_gui_visible    = !g_gui_visible;
+    if (g_input.do_toggle_params) g_params_visible = !g_params_visible;
+
+    Uint64 now = SDL_GetPerformanceCounter();
+    float  dt  = (float)(now - g_prev) / (float)g_freq;
+    g_prev = now;
+    if (dt > 0.05f)  dt = 0.05f;
+    if (dt < 0.001f) dt = 0.001f;
+
+    if (g_input.do_reset)
+        ps_reset(&g_ps, &g_params);
+
+    if (g_input.do_ripple && g_ripple_count < MAX_RIPPLES) {
+        g_ripples[g_ripple_count].cx         = g_input.mouse_x;
+        g_ripples[g_ripple_count].cy         = g_input.mouse_y;
+        g_ripples[g_ripple_count].radius     = 0.0f;
+        g_ripples[g_ripple_count].max_radius = 1500.0f;
+        g_ripple_count++;
+    }
+
+    for (int ri = 0; ri < g_ripple_count; ) {
+        g_ripples[ri].radius += RIPPLE_SPEED * dt;
+        if (g_ripples[ri].radius > g_ripples[ri].max_radius)
+            g_ripples[ri] = g_ripples[--g_ripple_count];
+        else
+            ri++;
+    }
+
+    if (g_input.do_fullscreen) {
+        toggle_fullscreen();
+        int w, h;
+        SDL_GetWindowSize(g_window, &w, &h);
+        render_resize(g_renderer, w, h);
+        g_ps.win_w = w;
+        g_ps.win_h = h;
+        ps_reset(&g_ps, &g_params);
+    }
+
+    {
+        int w, h;
+        SDL_GetWindowSize(g_window, &w, &h);
+        if (w != g_ps.win_w || h != g_ps.win_h) {
+            render_resize(g_renderer, w, h);
+            g_ps.win_w = w;
+            g_ps.win_h = h;
+        }
+    }
+
+    ps_update(&g_ps, dt,
+              g_input.mouse_x, g_input.mouse_y,
+              g_input.mode, g_input.mode_active,
+              g_input.timestop_on,
+              g_input.gather_on,
+              g_ripples, g_ripple_count,
+              &g_params);
+
+    render_frame(g_renderer, &g_ps, g_fps, g_input.mode, &g_params);
+
+    {
+        int gr = gui_render(&g_params, g_gui_visible, g_params_visible,
+                            g_fps, g_ps.count, (int)g_input.mode,
+                            g_input.timestop_on);
+        if (gr & 1) ps_reset(&g_ps, &g_params);
+        if (gr & 2) ps_recolor(&g_ps, &g_params);
+    }
+
+    SDL_GL_SwapWindow(g_window);
+
+    g_frame_count++;
+    Uint64 elapsed = now - g_fps_timer;
+    if (elapsed >= g_freq) {
+        g_fps = (float)g_frame_count * (float)g_freq / (float)elapsed;
+        g_frame_count = 0;
+        g_fps_timer   = now;
+
+#ifndef __EMSCRIPTEN__
+        const char *mode_names[] = {
+            "NONE", "ATTRACT", "REPEL", "EXPLODE", "VORTEX", "SPAWN", "TIMESTOP"
+        };
+        char title_buf[256];
+        snprintf(title_buf, sizeof(title_buf),
+                 "ParticleSim | %d pts | %.0f FPS | %s%s"
+                 " | LMB:Attract RMB:Repel E:Explode V:Vortex"
+                 " S:Spawn T:TimeStop[%s] B:Ripple R:Reset F:Full P:GUI",
+                 g_ps.count, g_fps, mode_names[g_input.mode],
+                 g_input.timestop_on ? "+TS" : "",
+                 g_input.timestop_on ? "ON" : "OFF");
+        SDL_SetWindowTitle(g_window, title_buf);
+#endif
+    }
+
+#ifdef __EMSCRIPTEN__
+    if (g_input.should_quit) {
+        app_shutdown();
+        emscripten_cancel_main_loop();
+    }
+#endif
+}
+
+/* ------------------------------------------------------------------ */
 /*  app_run  –  メインループ                                            */
 /* ------------------------------------------------------------------ */
 void app_run(void)
 {
-    Uint64 freq    = SDL_GetPerformanceFrequency();
-    Uint64 prev    = SDL_GetPerformanceCounter();
+    g_freq        = SDL_GetPerformanceFrequency();
+    g_prev        = SDL_GetPerformanceCounter();
+    g_fps_timer   = g_prev;
+    g_fps         = 0.0f;
+    g_frame_count = 0;
 
-    float  fps         = 0.0f;
-    int    frame_count = 0;
-    Uint64 fps_timer   = prev;
-    char   title_buf[256];
-
-    while (!g_input.should_quit) {
-        /* ---- ImGui フレーム開始 ---- */
-        gui_new_frame();
-
-        /* ---- 入力処理 ---- */
-        input_process_ex(&g_input,
-                         gui_wants_mouse(),
-                         gui_wants_keyboard());
-
-        if (g_input.do_toggle_gui) {
-            g_gui_visible = !g_gui_visible;
-        }
-        if (g_input.do_toggle_params) {
-            g_params_visible = !g_params_visible;
-        }
-
-        /* ---- デルタタイム ---- */
-        Uint64 now = SDL_GetPerformanceCounter();
-        float  dt  = (float)(now - prev) / (float)freq;
-        prev = now;
-        if (dt > 0.05f)  dt = 0.05f;
-        if (dt < 0.001f) dt = 0.001f;
-
-        /* ---- リセット ---- */
-        if (g_input.do_reset) {
-            ps_reset(&g_ps, &g_params);
-        }
-
-        /* ---- 波紋の発生 ---- */
-        if (g_input.do_ripple && g_ripple_count < MAX_RIPPLES) {
-            g_ripples[g_ripple_count].cx         = g_input.mouse_x;
-            g_ripples[g_ripple_count].cy         = g_input.mouse_y;
-            g_ripples[g_ripple_count].radius     = 0.0f;
-            g_ripples[g_ripple_count].max_radius = 1500.0f;
-            g_ripple_count++;
-        }
-
-        /* ---- 波紋の半径を伸ばし、寿命切れを削除 ---- */
-        for (int ri = 0; ri < g_ripple_count; ) {
-            g_ripples[ri].radius += RIPPLE_SPEED * dt;
-            if (g_ripples[ri].radius > g_ripples[ri].max_radius) {
-                g_ripples[ri] = g_ripples[--g_ripple_count];
-            } else {
-                ri++;
-            }
-        }
-
-        /* ---- フルスクリーン ---- */
-        if (g_input.do_fullscreen) {
-            toggle_fullscreen();
-            int w, h;
-            SDL_GetWindowSize(g_window, &w, &h);
-            render_resize(g_renderer, w, h);
-            g_ps.win_w = w;
-            g_ps.win_h = h;
-            ps_reset(&g_ps, &g_params);
-        }
-
-        /* ---- ウィンドウリサイズ ---- */
-        {
-            int w, h;
-            SDL_GetWindowSize(g_window, &w, &h);
-            if (w != g_ps.win_w || h != g_ps.win_h) {
-                render_resize(g_renderer, w, h);
-                g_ps.win_w = w;
-                g_ps.win_h = h;
-            }
-        }
-
-        /* ---- 粒子更新 ---- */
-        ps_update(&g_ps, dt,
-                  g_input.mouse_x, g_input.mouse_y,
-                  g_input.mode, g_input.mode_active,
-                  g_input.timestop_on,
-                  g_input.gather_on,
-                  g_ripples, g_ripple_count,
-                  &g_params);
-
-        /* ---- 描画 (粒子) ---- */
-        render_frame(g_renderer, &g_ps, fps, g_input.mode, &g_params);
-
-        /* ---- GUI 描画 (ImGui フレームを必ず終わらせる) ---- */
-        {
-            int gr = gui_render(&g_params, g_gui_visible, g_params_visible,
-                                fps, g_ps.count, (int)g_input.mode,
-                                g_input.timestop_on);
-            if (gr & 1) ps_reset(&g_ps, &g_params);    /* Respawn */
-            if (gr & 2) ps_recolor(&g_ps, &g_params);  /* Recolor */
-        }
-
-        SDL_GL_SwapWindow(g_window);
-
-        /* ---- FPS 計測 & タイトル更新 (1秒ごと) ---- */
-        frame_count++;
-        Uint64 elapsed = now - fps_timer;
-        if (elapsed >= freq) {
-            fps = (float)frame_count * (float)freq / (float)elapsed;
-            frame_count = 0;
-            fps_timer   = now;
-
-            const char *mode_names[] = {
-                "NONE", "ATTRACT", "REPEL", "EXPLODE", "VORTEX", "SPAWN", "TIMESTOP"
-            };
-
-            snprintf(title_buf, sizeof(title_buf),
-                     "ParticleSim | %d pts | %.0f FPS | %s%s"
-                     " | LMB:Attract RMB:Repel E:Explode V:Vortex"
-                     " S:Spawn T:TimeStop[%s] B:Ripple R:Reset F:Full P:GUI",
-                     g_ps.count, fps, mode_names[g_input.mode],
-                     g_input.timestop_on ? "+TS" : "",
-                     g_input.timestop_on ? "ON" : "OFF");
-            SDL_SetWindowTitle(g_window, title_buf);
-        }
-    }
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop(main_loop_iter, 0, 1);
+#else
+    while (!g_input.should_quit)
+        main_loop_iter();
+#endif
 }
 
 /* ------------------------------------------------------------------ */

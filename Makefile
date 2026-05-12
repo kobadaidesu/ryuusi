@@ -115,3 +115,83 @@ clean:
 
 run: all
 	$(TARGET)
+
+# ============================================================
+#  WebAssembly ターゲット (Emscripten)
+#
+#  使い方:
+#    source ~/emsdk/emsdk_env.sh
+#    make wasm
+#    python3 -m http.server -d bin   # ブラウザで localhost:8000/index.html
+# ============================================================
+EMCC    := emcc
+EMCXX   := em++
+WASMDIR := $(OBJDIR)/wasm
+WASM_TARGET := bin/index.html
+
+WASM_COMMON := \
+    -O2 \
+    -DIMGUI_IMPL_OPENGL_ES3 \
+    -sUSE_SDL=2 \
+    -I$(SRCDIR) -I$(IMGDIR)
+
+WASM_CFLAGS   := $(WASM_COMMON) -std=c99
+WASM_CXXFLAGS := $(WASM_COMMON) -std=c++17
+
+WASM_LDFLAGS := \
+    -sUSE_SDL=2 \
+    -sUSE_WEBGL2=1 \
+    -sFULL_ES3=1 \
+    -sWASM=1 \
+    -sALLOW_MEMORY_GROWTH=1 \
+    -sINITIAL_MEMORY=67108864
+
+WASM_C_SRCS  := $(wildcard $(SRCDIR)/*.c)
+WASM_C_OBJS  := $(patsubst $(SRCDIR)/%.c, $(WASMDIR)/%.o, $(WASM_C_SRCS))
+
+WASM_IMGUI_OBJS := \
+    $(WASMDIR)/im_imgui.o \
+    $(WASMDIR)/im_draw.o \
+    $(WASMDIR)/im_tables.o \
+    $(WASMDIR)/im_widgets.o \
+    $(WASMDIR)/im_sdl2.o \
+    $(WASMDIR)/im_opengl3.o
+
+WASM_ALL_OBJS := $(WASM_C_OBJS) $(WASMDIR)/gui.o $(WASM_IMGUI_OBJS)
+
+.PHONY: wasm wasm-clean
+
+wasm: $(WASM_TARGET)
+
+$(WASM_TARGET): $(WASM_ALL_OBJS) | bin
+	$(EMCXX) -o $@ $^ $(WASM_LDFLAGS)
+
+$(WASMDIR)/%.o: $(SRCDIR)/%.c | $(WASMDIR)
+	$(EMCC) $(WASM_CFLAGS) -c -o $@ $<
+
+$(WASMDIR)/gui.o: $(SRCDIR)/gui.cpp | $(WASMDIR)
+	$(EMCXX) $(WASM_CXXFLAGS) -c -o $@ $<
+
+$(WASMDIR)/im_imgui.o: $(IMGDIR)/imgui.cpp | $(WASMDIR)
+	$(EMCXX) $(WASM_CXXFLAGS) -c -o $@ $<
+
+$(WASMDIR)/im_draw.o: $(IMGDIR)/imgui_draw.cpp | $(WASMDIR)
+	$(EMCXX) $(WASM_CXXFLAGS) -c -o $@ $<
+
+$(WASMDIR)/im_tables.o: $(IMGDIR)/imgui_tables.cpp | $(WASMDIR)
+	$(EMCXX) $(WASM_CXXFLAGS) -c -o $@ $<
+
+$(WASMDIR)/im_widgets.o: $(IMGDIR)/imgui_widgets.cpp | $(WASMDIR)
+	$(EMCXX) $(WASM_CXXFLAGS) -c -o $@ $<
+
+$(WASMDIR)/im_sdl2.o: $(IMGDIR)/imgui_impl_sdl2.cpp | $(WASMDIR)
+	$(EMCXX) $(WASM_CXXFLAGS) -c -o $@ $<
+
+$(WASMDIR)/im_opengl3.o: $(IMGDIR)/imgui_impl_opengl3.cpp | $(WASMDIR)
+	$(EMCXX) $(WASM_CXXFLAGS) -c -o $@ $<
+
+$(WASMDIR):
+	mkdir -p $(WASMDIR)
+
+wasm-clean:
+	rm -rf $(WASMDIR) $(WASM_TARGET) bin/index.js bin/index.wasm

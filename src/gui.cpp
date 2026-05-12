@@ -12,7 +12,11 @@
 #include "imgui/imgui_impl_opengl3.h"
 
 #include <SDL2/SDL.h>
-#include <GL/glew.h>
+#ifdef __EMSCRIPTEN__
+#  include <GLES3/gl3.h>
+#else
+#  include <GL/glew.h>
+#endif
 #include <cstdio>
 
 /* ------------------------------------------------------------------ */
@@ -72,7 +76,8 @@ void gui_init(SDL_Window *window, void *gl_ctx)
     ImGui::StyleColorsDark();
     ImGui::GetStyle().Alpha = 0.92f;
 
-    /* 日本語フォントを読み込む (Meiryo / Windows フォントフォルダ) */
+    /* 日本語フォントを読み込む (Emscripten では仮想FSにフォントがないためスキップ) */
+#ifndef __EMSCRIPTEN__
     static const ImWchar jp_ranges[] = {
         0x0020, 0x00FF,   /* ASCII + Latin */
         0x3000, 0x30FF,   /* ひらがな・カタカナ */
@@ -92,7 +97,9 @@ void gui_init(SDL_Window *window, void *gl_ctx)
         ImFont *f = io.Fonts->AddFontFromFileTTF(font_paths[k], 16.0f, nullptr, jp_ranges);
         if (f) loaded = true;
     }
-    if (!loaded) {
+    if (!loaded)
+#endif
+    {
         io.Fonts->AddFontDefault();
         io.FontGlobalScale = 1.2f;
     }
@@ -128,7 +135,11 @@ void gui_init(SDL_Window *window, void *gl_ctx)
     c[ImGuiCol_Separator]       = ImVec4(0.30f, 0.30f, 0.50f, 0.80f);
 
     ImGui_ImplSDL2_InitForOpenGL(window, gl_ctx);
+#ifdef __EMSCRIPTEN__
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
     ImGui_ImplOpenGL3_Init("#version 330 core");
+#endif
 }
 
 void gui_new_frame(void)
