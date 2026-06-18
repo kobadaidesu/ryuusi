@@ -66,7 +66,6 @@ Source files:
 - GLEW
 - Dear ImGui
 - Make / CMake
-- Emscripten target in `Makefile`
 
 ## ビルド方法 / Build
 
