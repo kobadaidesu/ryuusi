@@ -12,32 +12,14 @@
 
 View the demo page for interaction videos and a visual walkthrough.
 
-GitHub上で `docs/index.html` をクリックすると、WebページではなくHTMLのソースコードが表示される場合があります。紹介サイトをページとして見る場合は、ローカルサーバーまたは公開URLを使ってください。
-
-On GitHub, opening `docs/index.html` may show the HTML source instead of rendering the page. Use a local server or a published URL to view the demo as a website.
-
 ### 紹介サイトを見る / View the Demo Site
 
-Local preview:
-
-```bash
-python3 -m http.server 8000 -d docs
-```
-
-Then open:
-
-```text
-http://localhost:8000
-```
-
-Published URL:
-
-```text
-https://kobadaidesu.github.io/ryuusi/
-```
+[紹介サイト / Demo site](https://kobadaidesu.github.io/ryuusi/)
 
 `docs/index.html` is deployed as GitHub Pages by `.github/workflows/pages.yml`.
-If this is the first deployment, set GitHub Pages' source to **GitHub Actions** in the repository settings.
+GitHub上で `docs/index.html` をクリックするとHTMLソースが表示されるため、Webページとして見る場合は上の公開URLを使ってください。
+
+On GitHub, opening `docs/index.html` shows the HTML source. Use the published URL above to view the rendered website.
 
 Source files:
 
