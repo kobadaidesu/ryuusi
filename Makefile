@@ -2,7 +2,7 @@
 #  Makefile  –  C99 + C++ (Dear ImGui) 混在ビルド
 #
 #  使い方:
-#    make           → Release ビルド (bin/particle_sim)
+#    make           → Release ビルド (bin/particle_flow)
 #    make DEBUG=1   → Debug ビルド
 #    make clean     → ビルド成果物を削除
 #    make run       → ビルド後に実行
@@ -14,15 +14,17 @@
 
 CC      := gcc
 CXX     := g++
-TARGET  := bin/particle_sim
+TARGET  := bin/particle_flow
 SRCDIR  := src
 OBJDIR  := obj
-IMGDIR  := src/imgui
+THIRDDIR := third_party
+IMGDIR  := $(THIRDDIR)/imgui
 
 # ---- コンパイルフラグ ----
 COMMON_FLAGS := -Wall -Wextra
+DEBUG ?= 0
 
-ifdef DEBUG
+ifeq ($(DEBUG),1)
     COMMON_FLAGS += -g -O0 -DDEBUG
 else
     COMMON_FLAGS += -O3 -march=native -ffast-math -funroll-loops -DNDEBUG
@@ -38,12 +40,12 @@ ifeq ($(PKG_LIBS),)
 endif
 
 CFLAGS   := $(COMMON_FLAGS) -std=c99   $(PKG_CFLAGS) -MMD -MP
-CXXFLAGS := $(COMMON_FLAGS) -std=c++17 $(PKG_CFLAGS) -I$(SRCDIR) -I$(IMGDIR) -MMD -MP
+CXXFLAGS := $(COMMON_FLAGS) -std=c++17 $(PKG_CFLAGS) -I$(SRCDIR) -I$(THIRDDIR) -I$(IMGDIR) -MMD -MP
 LIBS     := $(PKG_LIBS) -lm
 
 ifeq ($(OS),Windows_NT)
     LIBS   := -lSDL2 -lSDL2main -lGLEW32 -lopengl32 -lm
-    TARGET := bin/particle_sim.exe
+    TARGET := bin/particle_flow.exe
 endif
 
 # ---- ソース → オブジェクト ----
@@ -133,7 +135,7 @@ WASM_COMMON := \
     -O2 \
     -DIMGUI_IMPL_OPENGL_ES3 \
     -sUSE_SDL=2 \
-    -I$(SRCDIR) -I$(IMGDIR)
+    -I$(SRCDIR) -I$(THIRDDIR) -I$(IMGDIR)
 
 WASM_CFLAGS   := $(WASM_COMMON) -std=c99
 WASM_CXXFLAGS := $(WASM_COMMON) -std=c++17

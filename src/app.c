@@ -30,7 +30,7 @@
 /* ------------------------------------------------------------------ */
 /*  定数                                                                */
 /* ------------------------------------------------------------------ */
-#define WINDOW_TITLE  "ParticleSim  [P: Params GUI]"
+#define WINDOW_TITLE  "Particle Flow  [P: HUD / Tab: Params]"
 #define WIN_W         1280
 #define WIN_H          720
 #define VSYNC_ON       0
@@ -225,7 +225,7 @@ static void main_loop_iter(void)
         };
         char title_buf[256];
         snprintf(title_buf, sizeof(title_buf),
-                 "ParticleSim | %d pts | %.0f FPS | %s%s"
+                 "Particle Flow | %d pts | %.0f FPS | %s%s"
                  " | LMB:Attract RMB:Repel E:Explode V:Vortex"
                  " S:Spawn T:TimeStop[%s] B:Ripple R:Reset F:Full P:GUI",
                  g_ps.count, g_fps, mode_names[g_input.mode],

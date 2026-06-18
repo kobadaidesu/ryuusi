@@ -5,6 +5,15 @@ obj/
 # ImGui 自動生成
 imgui.ini
 
+# アプリ内プリセット保存
+preset_*.bin
+
+# CMake
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
 # メモ
 111.txt
 
