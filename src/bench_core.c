@@ -370,6 +370,12 @@ char *bench_data_json(const BenchData *d, const BenchMeta *meta)
               BENCH_PARTICLES, meta->width, meta->height, (double)BENCH_DT);
     sb_printf(&s, "  \"runs\": %d, \"warmup_frames\": %d, \"gpu_timer\": %s,\n",
               d->runs, BENCH_WARMUP, meta->gpu_timer ? "true" : "false");
+    sb_printf(&s, "  \"cull_limit\": %d,\n", meta->cull_limit);
+    if (meta->gpu_renderer) {
+        sb_printf(&s, "  \"gpu_renderer\": ");
+        sb_json_str(&s, meta->gpu_renderer);
+        sb_printf(&s, ",\n");
+    }
     if (meta->note) {
         sb_printf(&s, "  \"note\": ");
         sb_json_str(&s, meta->note);
@@ -420,9 +426,11 @@ char *bench_data_json(const BenchData *d, const BenchMeta *meta)
 char *bench_data_markdown(const BenchData *d, const BenchMeta *meta)
 {
     StrBuf s = { NULL, 0, 0 };
-    sb_printf(&s, "### %s (%s, build %s%s, %d run%s, %dx%d)\n\n",
+    sb_printf(&s, "### %s (%s, build %s%s, %d run%s, %dx%d, cull %d)\n\n",
               meta->label, meta->platform, meta->build, meta->dirty ? "-dirty" : "",
-              d->runs, d->runs > 1 ? "s" : "", meta->width, meta->height);
+              d->runs, d->runs > 1 ? "s" : "", meta->width, meta->height, meta->cull_limit);
+    if (meta->gpu_renderer)
+        sb_printf(&s, "GPU: %s\n\n", meta->gpu_renderer);
     sb_printf(&s, "ms は p50 / p95%s\n\n",
               meta->gpu_timer || !stage_enabled(meta, BS_GPU) ? ""
                                                              : "。gpu はタイマーが使えず推定不可");

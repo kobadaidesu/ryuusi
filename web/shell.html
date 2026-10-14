@@ -131,6 +131,7 @@
       document.body.classList.add('bench');
       var args = ['--bench', '--bench-label=' + (q.get('label') || 'bench')];
       if (q.get('runs')) args.push('--bench-runs=' + q.get('runs'));
+      if (q.get('cull')) args.push('--bench-cull=' + q.get('cull'));
       if (q.get('report')) args.push('--bench-report=' + q.get('report'));
       Module.arguments = args;
     })();

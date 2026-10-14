@@ -57,8 +57,11 @@ make bench LABEL=try BENCH_RUNS=1  # 1 回だけ (約 20 秒)
 直接動かすなら:
 
 ```sh
-./bin/particle_flow --bench [--bench-out=path.json] [--bench-runs=N] [--bench-label=name]
+./bin/particle_flow --bench [--bench-out=path.json] [--bench-runs=N] [--bench-label=name] [--bench-cull=N]
 ```
+
+`--bench-cull=N` は飽和カリング (同じ画素に中心がある粒子を N 個までしか描かない) の上限。0 で無効、省略時は既定値 (`PS_CULL_LIMIT_DEFAULT`)。
+結果の JSON には `cull_limit` と、GPU の名前 `gpu_renderer` が入る。
 
 ウィンドウが開いて計測が進み、終わると標準出力に Markdown の表を出して終了する。
 **ウィンドウを隠さないこと** (macOS は隠れたウィンドウの描画を間引くので数字が変わる)。
@@ -81,9 +84,21 @@ http://127.0.0.1:8126/?bench=1&label=baseline&report=/report
 | `bench=1` | 計測モードで起動 (キャンバスを 1280×720 に固定) |
 | `label=name` | 結果のラベル (既定 `bench`) |
 | `runs=N` | 繰り返す回数 (既定 1) |
+| `cull=N` | 飽和カリングの上限 (`--bench-cull` と同じ。0 で無効) |
 | `report=URL` | 結果の JSON を POST する先。`serve.py` なら `/report` で `bench/results/<label>-wasm.json` に保存される |
 
 終わるとページのキャンバスの下に表と JSON が出る (`window.benchResult` にも入る)。タブのタイトルが `BENCH DONE` になる。
+
+タブを前面に出しておけないときは headless Chrome で走らせられる (headless では rAF が止まらない):
+
+```sh
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+  --user-data-dir=/tmp/pf-chrome --window-size=1400,900 \
+  "http://127.0.0.1:8126/?bench=1&label=try&report=/report"
+# bench/results/try-wasm.json ができたら Chrome を止める
+```
+
+`gpu_renderer` で実 GPU か確かめること。`ANGLE (Apple, ANGLE Metal Renderer: ...)` なら実 GPU、`SwiftShader` ならソフトウェア描画なので gpu の数字は参考にならない (CPU 側の update / pack / upload を比べる)。
 `serve.py` は COOP / COEP ヘッダーを付けて cross-origin isolated にしている (`performance.now()` の分解能が 5 µs になる)。
 
 ## 比較
@@ -94,6 +109,20 @@ python3 bench/compare.py bench/results/baseline-native.json bench/results/after-
 
 シナリオ × 段階の「before → after (×倍率)」の表 (p50 と p95) と、上の判定によるチェックサムの一致 / 不一致を Markdown で出す。
 倍率は before / after (×2.00 なら 2 倍速い)。
+
+## スクリーンショットで見た目を比べる (ネイティブ)
+
+```sh
+mkdir -p /tmp/shots-before
+./bin/particle_flow --bench --bench-label=before --bench-shot=/tmp/shots-before
+# ... 変更してビルドし直して ...
+./bin/particle_flow --bench --bench-label=after --bench-shot=/tmp/shots-after
+python3 bench/imgdiff.py /tmp/shots-before /tmp/shots-after
+```
+
+`--bench-shot=dir` は各シナリオの最後のフレームで、粒子を描いた直後 (GUI を描く前) の画面を `dir/<label>-<scenario>.ppm` に保存する。
+入力も乱数も固定なので、描画が同じなら画素も一致する。`imgdiff.py` はシナリオごとに最大差・差のある画素数・差の平均を出す。
+読み戻しで GPU を待つので、`--bench-shot` を付けた回の時間の数字は使わない (別に走らせる)。PNG にするなら `sips -s format png x.ppm --out x.png`。
 
 ## sim_bench (物理だけのマイクロベンチ)
 

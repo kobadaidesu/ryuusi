@@ -50,6 +50,10 @@ def stage_value(scenario, stage, key):
 def describe(d):
     dirty = "-dirty" if d.get("dirty") else ""
     gpu = "" if d.get("gpu_timer") else ", gpu 推定不可"
+    if d.get("gpu_renderer"):
+        gpu = f", GPU {d['gpu_renderer']}" + gpu
+    if "cull_limit" in d:
+        gpu = f", cull {d['cull_limit']}" + gpu
     return f"{d.get('label')} ({d.get('platform')}, {d.get('build')}{dirty}, {d.get('runs', 1)} runs{gpu})"
 
 

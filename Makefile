@@ -202,7 +202,7 @@ WASM_LDFLAGS := \
     --shell-file $(WASM_SHELL)
 
 # 計測モードの結果をページに出すのに使う (bench.c の EM_JS)
-WASM_LDFLAGS += -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$$UTF8ToString
+WASM_LDFLAGS += '-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$$UTF8ToString,$$stringToNewUTF8'
 
 WASM_C_SRCS  := $(wildcard $(SRCDIR)/*.c)
 WASM_C_OBJS  := $(patsubst $(SRCDIR)/%.c, $(WASMDIR)/%.o, $(WASM_C_SRCS))

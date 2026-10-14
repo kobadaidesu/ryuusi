@@ -6,7 +6,7 @@
  *  の両方でビルドできる。チェックサムはアプリの計測モードと一致するはず。
  *
  *  使い方:
- *    ./bin/sim_bench [--label=name] [--runs=N] [--out=path.json]
+ *    ./bin/sim_bench [--label=name] [--runs=N] [--out=path.json] [--cull=N]
  *    node bin/sim_bench.js [同上]
  */
 
@@ -32,6 +32,9 @@
 #define RIPPLE_SPEED 700.0f
 
 /* app.c の main_loop_iter と同じ順で 1 フレーム進める。ms[] に段階ごとの時間 */
+/* 飽和カリング (アプリの Renderer と同じく 1280x720 の画素ごとのカウント) */
+static PackCull g_cull = { NULL, BENCH_W, BENCH_H, PS_CULL_LIMIT_DEFAULT };
+
 static void step(ParticleSystem *ps, GpuVertex *staging, const SimParams *params,
                  RippleWave *ripples, int *ripple_count, const BenchInput *in,
                  double *update_ms, double *pack_ms)
@@ -57,7 +60,7 @@ static void step(ParticleSystem *ps, GpuVertex *staging, const SimParams *params
     ps_update(ps, dt, in->mouse_x, in->mouse_y, in->mode, in->mode_active,
               in->timestop_on, in->gather_on, ripples, *ripple_count, params);
     double t1 = bench_now_ms();
-    ps_pack_gpu(ps, staging, MAX_PARTICLES);
+    ps_pack_gpu(ps, staging, MAX_PARTICLES, &g_cull);
     double t2 = bench_now_ms();
 
     *update_ms = t1 - t0;
@@ -73,6 +76,7 @@ int main(int argc, char **argv)
         if      (strncmp(argv[i], "--label=", 8) == 0) label = argv[i] + 8;
         else if (strncmp(argv[i], "--out=", 6) == 0)   out   = argv[i] + 6;
         else if (strncmp(argv[i], "--runs=", 7) == 0)  runs  = atoi(argv[i] + 7);
+        else if (strncmp(argv[i], "--cull=", 7) == 0)  g_cull.limit = atoi(argv[i] + 7);
         else { fprintf(stderr, "unknown option: %s\n", argv[i]); return 1; }
     }
     if (runs < 1) runs = 1;
@@ -80,7 +84,8 @@ int main(int argc, char **argv)
     ParticleSystem *ps = (ParticleSystem*)malloc(sizeof(ParticleSystem));
     GpuVertex *staging = (GpuVertex*)malloc(MAX_PARTICLES * sizeof(GpuVertex));
     BenchData *data    = bench_data_new(runs);
-    if (!ps || !staging || !data) { fprintf(stderr, "out of memory\n"); return 1; }
+    g_cull.counts      = (uint16_t*)malloc((size_t)BENCH_W * BENCH_H * sizeof(uint16_t));
+    if (!ps || !staging || !data || !g_cull.counts) { fprintf(stderr, "out of memory\n"); return 1; }
 
     SimParams params = SIM_PARAMS_DEFAULT;
     params.particle_count = BENCH_PARTICLES;
@@ -136,7 +141,9 @@ int main(int argc, char **argv)
     meta.width      = BENCH_W;
     meta.height     = BENCH_H;
     meta.gpu_timer  = 0;
+    meta.gpu_renderer = NULL;
     meta.note       = "sim_bench: ps_update + ps_pack_gpu のみ (描画なし)。frame = update + pack、fps はその処理能力";
+    meta.cull_limit = g_cull.limit;
     meta.stage_mask = BENCH_STAGE_BIT(BS_UPDATE) | BENCH_STAGE_BIT(BS_PACK)
                     | BENCH_STAGE_BIT(BS_FRAME);
 
@@ -155,6 +162,7 @@ int main(int argc, char **argv)
     }
 
     bench_data_free(data);
+    free(g_cull.counts);
     free(staging);
     free(ps);
     return 0;

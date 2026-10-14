@@ -25,8 +25,11 @@ void render_frame(Renderer *r,
                   InteractMode mode,
                   const SimParams *params);
 
-/* ウィンドウリサイズ */
+/* ウィンドウリサイズ (飽和カリングのカウント配列も作り直す) */
 void render_resize(Renderer *r, int win_w, int win_h);
+
+/* 飽和カリングの上限 (既定 PS_CULL_LIMIT_DEFAULT、0 で無効) */
+void render_set_cull_limit(Renderer *r, int limit);
 
 /* OpenGL リソース解放 */
 void render_shutdown(Renderer *r);
