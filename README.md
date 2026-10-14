@@ -2,6 +2,14 @@
 
 ![Particle Flow hero image](docs/assets/images/hero.png)
 
+**▶ ブラウザで遊ぶ / Play in your browser: https://kobadaidesu.github.io/ryuusi/app/**
+**紹介サイト / Demo site: https://kobadaidesu.github.io/ryuusi/**
+
+> **動作の軽さについて / Performance note**
+> ブラウザ版はシングルスレッドで動きます(GitHub Pages では WebAssembly のマルチスレッドに必要な HTTP ヘッダーを設定できないため)。粒子を一か所に集めたときなどは重くなります。軽快に動かしたい場合は、このリポジトリを clone してネイティブ版をビルドしてください([ビルド方法](#ビルド方法--build))。ネイティブ版は `-O3 -march=native` で最適化され、ブラウザ版よりかなり軽く動きます。
+>
+> The browser version runs single-threaded (GitHub Pages cannot set the HTTP headers required for WebAssembly threads), so it slows down when many particles gather. For the best performance, clone this repository and build the native version (see [Build](#ビルド方法--build)).
+
 ## 概要 / Overview
 
 **Particle Flow** は、最大 300,000 個の粒子をリアルタイムに描画・物理演算し、マウスとキーボードで流れや模様を操作できるインタラクティブビジュアル作品です。
@@ -12,19 +20,17 @@
 
 View the demo page for interaction videos and a visual walkthrough.
 
-### 紹介サイトを見る / View the Demo Site
+### 公開ページ / Published pages
 
-[紹介サイト / Demo site](https://kobadaidesu.github.io/ryuusi/)
+| | URL |
+| --- | --- |
+| ブラウザ版(WebAssembly)/ Browser version | https://kobadaidesu.github.io/ryuusi/app/ |
+| 紹介サイト / Demo site | https://kobadaidesu.github.io/ryuusi/ |
+| パラメーター詳細 / Parameter details | https://kobadaidesu.github.io/ryuusi/details/ |
 
-`docs/index.html` is deployed as GitHub Pages by `.github/workflows/pages.yml`.
-GitHub上で `docs/index.html` をクリックするとHTMLソースが表示されるため、Webページとして見る場合は上の公開URLを使ってください。
+どちらも `main` への push で `.github/workflows/pages.yml` が自動で公開します。GitHub 上で `docs/index.html` を開くと HTML ソースが表示されるので、Web ページとして見る場合は上の URL を使ってください。
 
-On GitHub, opening `docs/index.html` shows the HTML source. Use the published URL above to view the rendered website.
-
-Source files:
-
-- [紹介サイトHTML / Demo HTML source](docs/index.html)
-- [パラメーター詳細HTML / Parameter details source](docs/details/index.html)
+Both are published automatically by `.github/workflows/pages.yml` on push to `main`. Opening `docs/index.html` on GitHub shows the HTML source; use the URLs above to view the rendered pages.
 
 ## 主な機能 / Features
 
@@ -121,7 +127,7 @@ On push to `main`, the workflow builds the WebAssembly version and publishes it 
 
 ブラウザ版の制約 / Browser limitations:
 
-- シングルスレッドです(GitHub Pages では pthreads に必要な HTTP ヘッダーを設定できないため)。粒子数が多くて重い場合は Params の粒子数を下げてください
+- シングルスレッドです(GitHub Pages では pthreads に必要な HTTP ヘッダーを設定できないため)。粒子を集めたときなどに重くなります。軽快に動かしたい場合は clone してネイティブ版をビルドしてください。それでも重い場合は Params の粒子数を下げてください
 - 日本語フォントを同梱していないので、HUD は英語表示です
 - プリセットの保存はページを閉じると消えます
 
