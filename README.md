@@ -103,6 +103,28 @@ cmake --build build
 ./build/particle_flow
 ```
 
+### WebAssembly (ブラウザ版) / Browser build
+
+同じ C のコードを Emscripten で WebAssembly にして、ブラウザ(WebGL2)で動かせます。公開版は紹介サイトの「ブラウザで遊ぶ」から開けます。
+
+The same C code runs in the browser (WebGL2) via Emscripten. The published build is linked from the demo site.
+
+```bash
+brew install emscripten        # macOS
+make wasm                      # bin/index.html, index.js, index.wasm
+python3 -m http.server -d bin  # open http://localhost:8000/index.html
+```
+
+`main` に push すると `.github/workflows/pages.yml` が Emscripten でビルドし、紹介サイトと一緒に `app/` として GitHub Pages に公開します。ビルド成果物はリポジトリに入れません。
+
+On push to `main`, the workflow builds the WebAssembly version and publishes it with the demo site as `app/`. Build outputs are not committed.
+
+ブラウザ版の制約 / Browser limitations:
+
+- シングルスレッドです(GitHub Pages では pthreads に必要な HTTP ヘッダーを設定できないため)。粒子数が多くて重い場合は Params の粒子数を下げてください
+- 日本語フォントを同梱していないので、HUD は英語表示です
+- プリセットの保存はページを閉じると消えます
+
 ## ディレクトリ構成 / Project Structure
 
 ```text

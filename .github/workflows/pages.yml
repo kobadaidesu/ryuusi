@@ -1,12 +1,14 @@
+# GitHub Pages への公開。
+# 紹介サイト(docs/)と、Emscripten でビルドしたブラウザ版(app/)を一緒に公開する。
+# main に push されるたびにビルドするので、ビルド成果物(bin/)はリポジトリに入れない。
+# PR ではビルドが通るかだけ確かめて、公開はしない。
 name: Deploy GitHub Pages
 
 on:
   push:
     branches:
       - main
-    paths:
-      - docs/**
-      - .github/workflows/pages.yml
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -15,27 +17,47 @@ permissions:
   id-token: write
 
 concurrency:
-  group: github-pages
-  cancel-in-progress: false
+  group: github-pages-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 手元(Homebrew)と同じ版に固定する。上げるときは手元で make wasm を確認してから
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.12
+          actions-cache-folder: emsdk-cache
+
+      - name: Build WebAssembly
+        run: make wasm
+
+      # 公開するものだけを site/ に集める。紹介サイトがルート、ブラウザ版は app/
+      - name: Collect site files
+        run: |
+          mkdir -p site/app
+          cp -r docs/. site/
+          cp bin/index.html bin/index.js bin/index.wasm site/app/
+
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
   deploy:
+    # main への push(か手動実行)のときだけ公開する
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload static site
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: docs
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
