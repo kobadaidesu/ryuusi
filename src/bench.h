@@ -17,6 +17,7 @@
  *   --bench-runs=N       繰り返す回数 (既定 1)。結果は回ごとの p50 / p95 の中央値
  *   --bench-label=name   結果に付けるラベル (既定 "bench")
  *   --bench-report=url   結果の JSON を POST する先 (ブラウザ)
+ *   --bench-cull=N       飽和カリングの上限 (0 で無効)。省略時は PS_CULL_LIMIT_DEFAULT
  *   --bench-shot=dir     各シナリオの最後のフレームの粒子の描画を dir/<label>-<scenario>.ppm に保存
  *                        (ネイティブのみ。読み戻しで GPU を待つので、この指定をした回の時間は使わない)
  * 戻り値: 0 = OK、非 0 = 引数の誤り */

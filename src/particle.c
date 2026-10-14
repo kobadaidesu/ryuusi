@@ -353,28 +353,54 @@ void ps_recolor(ParticleSystem *ps, const SimParams *params)
 /*  ps_pack_gpu  –  SoA → インターリーブ GPU 頂点へ変換                 */
 /*  戻り値: 書き込んだ頂点数                                             */
 /* ------------------------------------------------------------------ */
-int ps_pack_gpu(const ParticleSystem *ps, GpuVertex *out, int max_out)
+static inline void pack_vertex(const ParticleSystem *ps, int i, GpuVertex *o)
+{
+    float life = ps->life[i];
+    /* 寿命に応じて彩度・明度を変化させる: 誕生 → 明るい, 消える → 暗い */
+    float sat  = 0.8f;
+    float val  = life * 1.4f;
+    if (val > 1.0f) val = 1.0f;
+
+    float r, g, b;
+    hsv2rgb(ps->hue[i], sat, val, &r, &g, &b);
+
+    o->x = ps->x[i];
+    o->y = ps->y[i];
+    o->r = r;
+    o->g = g;
+    o->b = b;
+    o->a = life;
+}
+
+int ps_pack_gpu(const ParticleSystem *ps, GpuVertex *out, int max_out,
+                const PackCull *cull)
 {
     int n = ps->count;
     if (n > max_out) n = max_out;
 
-    for (int i = 0; i < n; i++) {
-        float life = ps->life[i];
-        /* 寿命に応じて彩度・明度を変化させる: 誕生 → 明るい, 消える → 暗い */
-        float sat  = 0.8f;
-        float val  = life * 1.4f;
-        if (val > 1.0f) val = 1.0f;
-
-        float r, g, b;
-        hsv2rgb(ps->hue[i], sat, val, &r, &g, &b);
-
-        out[i].x = ps->x[i];
-        out[i].y = ps->y[i];
-        out[i].r = r;
-        out[i].g = g;
-        out[i].b = b;
-        out[i].a = life;
+    if (!cull || !cull->counts || cull->limit <= 0 || cull->w <= 0 || cull->h <= 0) {
+        for (int i = 0; i < n; i++)
+            pack_vertex(ps, i, &out[i]);
+        return n;
     }
-    return n;
+
+    /* ---- 飽和カリング: 中心画素ごとに limit 個まで ---- */
+    const int w = cull->w, h = cull->h;
+    const unsigned limit = cull->limit > 65535 ? 65535u : (unsigned)cull->limit;
+    uint16_t *counts = cull->counts;
+    memset(counts, 0, (size_t)w * (size_t)h * sizeof(uint16_t));
+
+    int m = 0;
+    for (int i = 0; i < n; i++) {
+        int px = (int)ps->x[i];
+        int py = (int)ps->y[i];
+        if (px < 0) px = 0; else if (px >= w) px = w - 1;
+        if (py < 0) py = 0; else if (py >= h) py = h - 1;
+        uint16_t *c = &counts[(size_t)py * (size_t)w + (size_t)px];
+        if (*c >= limit) continue;   /* この画素はもう飽和している */
+        (*c)++;
+        pack_vertex(ps, i, &out[m++]);
+    }
+    return m;
 }
 

@@ -10,6 +10,7 @@
 #define MAX_PARTICLES  300000
 #define SPAWN_PER_FRAME    300   /* 毎フレームのデフォルト生成数     */
 #define MAX_RIPPLES     32       /* 同時に存在できる波紋の最大数     */
+#define PS_CULL_LIMIT_DEFAULT 256 /* 飽和カリングの上限 (0 で無効)   */
 /* ------------------------------------------------------------------ *
  *  波紋 (app.c で管理、ps_update に const ポインタで渡す)
  * ------------------------------------------------------------------ */
@@ -96,10 +97,27 @@ void ps_seed(uint32_t seed);
 /* 位置・速度はそのままで色相だけ一括更新 */
 void ps_recolor(ParticleSystem *ps, const SimParams *params);
 
-/* GPU バッファへパック (render.c から呼ぶ) */
+/* ------------------------------------------------------------------ *
+ *  飽和カリング
+ *
+ *  画面は 8bit で、加算合成は 1.0 で飽和する。同じ画素に中心がある粒子を
+ *  limit 個描いたら、それ以降の粒子は描いても画素が変わらないので頂点を書かない。
+ *  G で 1 点に集めたとき、同じ画素に重なる 30 万個のブレンドの順番待ちが
+ *  GPU の重さの原因なので、描く点の数そのものを減らす。
+ *  counts は w*h 個 (ウィンドウと同じ 1px 単位、毎フレーム 0 に戻す)。
+ * ------------------------------------------------------------------ */
+typedef struct {
+    uint16_t *counts;
+    int       w, h;
+    int       limit;   /* 0 以下で無効 (全部描く) */
+} PackCull;
+
+/* GPU バッファへパック (render.c から呼ぶ)。cull が NULL なら全部描く。
+ * 戻り値: 書き込んだ頂点数 (カリングした分だけ ps->count より少ない) */
 int  ps_pack_gpu(const ParticleSystem *ps,
                  GpuVertex *out,         /* MAX_PARTICLES 確保済み前提 */
-                 int max_out);
+                 int max_out,
+                 const PackCull *cull);
 
 
 #endif /* PARTICLE_H */

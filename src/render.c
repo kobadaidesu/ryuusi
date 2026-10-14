@@ -79,6 +79,9 @@ struct Renderer {
     GLint  u_point_size;
     GpuVertex *staging; /* CPU ステージングバッファ */
 
+    /* 飽和カリング (ps_pack_gpu)。ウィンドウと同じ大きさの画素ごとのカウント */
+    PackCull cull;
+
     int win_w, win_h;
 
     /* ---- ベンチマーク用の計測 (render_profile_enable 後のみ) ---- */
@@ -136,6 +139,23 @@ static GLuint create_program(void)
     glDeleteShader(vs);
     glDeleteShader(fs);
     return prog;
+}
+
+/* 飽和カリングのカウント配列をウィンドウの大きさに合わせる */
+static void cull_alloc(Renderer *r, int w, int h)
+{
+    if (r->cull.counts && r->cull.w == w && r->cull.h == h) return;
+    free(r->cull.counts);
+    r->cull.counts = NULL;
+    r->cull.w = r->cull.h = 0;
+    if (w <= 0 || h <= 0) return;
+    r->cull.counts = (uint16_t*)malloc((size_t)w * (size_t)h * sizeof(uint16_t));
+    if (!r->cull.counts) {
+        fprintf(stderr, "[render] cull buffer malloc failed (culling disabled)\n");
+        return;
+    }
+    r->cull.w = w;
+    r->cull.h = h;
 }
 
 /* ------------------------------------------------------------------ */
@@ -200,6 +220,10 @@ Renderer *render_init(int win_w, int win_h)
         return NULL;
     }
 
+    /* ---- 飽和カリング ---- */
+    r->cull.limit = PS_CULL_LIMIT_DEFAULT;
+    cull_alloc(r, win_w, win_h);
+
     /* ---- OpenGL 基本設定 ---- */
 #ifndef __EMSCRIPTEN__
     glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
@@ -242,7 +266,7 @@ void render_frame(Renderer *r,
     glClear(GL_COLOR_BUFFER_BIT);
 
     /* ---- CPU→GPU 転送 ---- */
-    int n = ps_pack_gpu(ps, r->staging, MAX_PARTICLES);
+    int n = ps_pack_gpu(ps, r->staging, MAX_PARTICLES, &r->cull);
     double t1 = r->prof ? bench_now_ms() : 0.0;
 
     glBindBuffer(GL_ARRAY_BUFFER, r->vbo);
@@ -284,6 +308,12 @@ void render_resize(Renderer *r, int win_w, int win_h)
     r->win_w = win_w;
     r->win_h = win_h;
     glViewport(0, 0, win_w, win_h);
+    cull_alloc(r, win_w, win_h);
+}
+
+void render_set_cull_limit(Renderer *r, int limit)
+{
+    r->cull.limit = limit < 0 ? 0 : limit;
 }
 
 /* ------------------------------------------------------------------ */
@@ -297,6 +327,7 @@ void render_shutdown(Renderer *r)
     glDeleteProgram(r->prog);
     if (r->prof_gpu) glDeleteQueries(PROF_QUERIES, r->prof_q);
     free(r->staging);
+    free(r->cull.counts);
     free(r);
 }
 

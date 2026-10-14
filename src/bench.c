@@ -41,7 +41,8 @@ static struct {
     const char *label;
     const char *report_url;
     const char *shot_dir;
-} g_cfg = { 0, 1, NULL, "bench", NULL, NULL };
+    int         cull_limit;
+} g_cfg = { 0, 1, NULL, "bench", NULL, NULL, PS_CULL_LIMIT_DEFAULT };
 
 static struct {
     Renderer  *renderer;
@@ -81,6 +82,12 @@ int bench_configure(int argc, char **argv)
             g_cfg.label = a + 14;
         } else if (strncmp(a, "--bench-report=", 15) == 0) {
             g_cfg.report_url = a + 15;
+        } else if (strncmp(a, "--bench-cull=", 13) == 0) {
+            g_cfg.cull_limit = atoi(a + 13);
+            if (g_cfg.cull_limit < 0) {
+                fprintf(stderr, "--bench-cull は 0 以上: %s\n", a);
+                return -1;
+            }
         } else if (strncmp(a, "--bench-shot=", 13) == 0) {
             g_cfg.shot_dir = a + 13;
         } else if (strncmp(a, "--bench", 7) == 0) {
@@ -103,6 +110,7 @@ void bench_start(Renderer *r, int win_w, int win_h)
     g_b.renderer   = r;
     g_b.data       = bench_data_new(g_cfg.runs);
     g_b.gpu_timer  = render_profile_enable(r);
+    render_set_cull_limit(r, g_cfg.cull_limit);
     g_b.win_w      = win_w;
     g_b.win_h      = win_h;
     g_b.scenario   = -1;
@@ -117,7 +125,8 @@ void bench_start(Renderer *r, int win_w, int win_h)
     if (win_w != BENCH_W || win_h != BENCH_H)
         fprintf(stderr, "[bench] warning: window is %dx%d (expected %dx%d)\n",
                 win_w, win_h, BENCH_W, BENCH_H);
-    printf("[bench] runs=%d gpu_timer=%s\n", g_cfg.runs, g_b.gpu_timer ? "yes" : "no");
+    printf("[bench] runs=%d gpu_timer=%s cull=%d\n", g_cfg.runs, g_b.gpu_timer ? "yes" : "no",
+           g_cfg.cull_limit);
 }
 
 /* ------------------------------------------------------------------ */
@@ -208,6 +217,7 @@ static void bench_report(void)
     meta.gpu_timer  = g_b.gpu_timer;
     meta.note       = note;
     meta.stage_mask = (1u << BS_COUNT) - 1u;
+    meta.cull_limit = g_cfg.cull_limit;
 
     char *json = bench_data_json(g_b.data, &meta);
     char *md   = bench_data_markdown(g_b.data, &meta);
