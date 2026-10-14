@@ -110,6 +110,28 @@ python3 bench/compare.py bench/results/baseline-native.json bench/results/after-
 シナリオ × 段階の「before → after (×倍率)」の表 (p50 と p95) と、上の判定によるチェックサムの一致 / 不一致を Markdown で出す。
 倍率は before / after (×2.00 なら 2 倍速い)。
 
+結果に回ごとの p50 (`runs_p50`) があれば、同じビルドの回ごとの p50 のばらつき (最小〜最大) も出す。
+ばらつきは before と after の (最大 - 最小) の大きいほうで、p50 の差がその 2 倍未満なら「ぶれの範囲」と印を付ける (p50 の表では ≈)。
+`--noise noise.json` を付けると、その結果 (同じビルドを続けて走らせたもの) の幅もばらつきに含める。
+
+別々に走らせた結果 (ほかの版と交互に 1 回ずつ走らせたものなど) は `merge.py` で 1 つにまとめる。
+まとめ方は bench_core と同じ (回ごとの p50 / p95 の中央値) で、回ごとの p50 は `runs_p50` に並ぶ。`runs_p50` の無い古い版の 1 回分の結果も使える。
+
+```sh
+python3 bench/merge.py bench/results/x-native.json x run1.json run2.json run3.json
+```
+
+## 静かな計測 (baseline と最終版を交互に)
+
+```sh
+bench/quiet_run.sh <baseline の作業ツリー> <作業用ディレクトリ>
+```
+
+native は baseline と最終版を交互に 5 回ずつ、続けてノイズフロア用に最終版を 5 回、wasm は headless Chrome で交互に 3 回ずつ走らせ、
+`bench/results/quiet-*.json` にまとめて、比較を `<作業用ディレクトリ>/compare-*.md` に出す。ビルドはしないので、先に
+最終版 (`make && make wasm`)、baseline の作業ツリーの native、`bin/before/` に baseline の wasm を用意しておく。回数は
+`NATIVE_RUNS` / `NOISE_RUNS` / `WASM_RUNS`、ポートは `PORT` (既定 8126) で変えられる。
+
 ## スクリーンショットで見た目を比べる (ネイティブ)
 
 ```sh
