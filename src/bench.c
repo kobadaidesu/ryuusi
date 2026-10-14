@@ -293,7 +293,13 @@ void bench_end_frame(const double stage_ms[BS_COUNT], const ParticleSystem *ps)
 
     /* 次のフレームへ */
     int frames = sc >= 0 ? bench_scenario(sc)->frames : BENCH_WARMUP;
-    if (++g_b.frame < frames) return;
+    ++g_b.frame;
+    if (sc >= 0 && g_b.frame == BENCH_EARLY_FRAME) {
+        BenchChecksum cs;
+        bench_checksum(ps, &cs);
+        bench_data_set_checksum_early(g_b.data, g_b.run, sc, &cs);
+    }
+    if (g_b.frame < frames) return;
 
     if (sc >= 0) {
         BenchChecksum cs;

@@ -95,6 +95,11 @@ void bench_scenario_input(int scenario, int frame, BenchInput *out)
         case SC_GATHER_HOLD:        /* G を押し続ける */
             out->gather_on = 1;
             break;
+        case SC_GATHER_RELEASE_SPREAD:
+            /* 中央のままだと全粒子が 1 点に重なって力がゼロになり広がらない。
+             * 開始時にカーソルを右へ動かして広がりを測る */
+            out->mouse_x = 900.0f;
+            break;
         case SC_VORTEX:             /* V を押し続ける */
             out->mode        = MODE_VORTEX;
             out->mode_active = 1;
@@ -108,7 +113,7 @@ void bench_scenario_input(int scenario, int frame, BenchInput *out)
         case SC_RIPPLE:             /* B を 30 フレームごとに */
             out->do_ripple = (frame % 30 == 0);
             break;
-        default:                    /* idle / ウォームアップ / G を離したあと */
+        default:                    /* idle / ウォームアップ / G を離した直後 (中央のまま = 1 点に重なった最悪ケース) */
             break;
     }
 }
@@ -139,7 +144,8 @@ struct BenchData {
     int            runs;
     double        *ms;        /* [run][scenario][stage][frame]  */
     double        *wall;      /* [run][scenario] 秒            */
-    BenchChecksum *checksum;  /* [run][scenario]               */
+    BenchChecksum *checksum;  /* [run][scenario] 終了時        */
+    BenchChecksum *early;     /* [run][scenario] BENCH_EARLY_FRAME フレーム後 */
 };
 
 static size_t ms_index(int run, int sc, int stage, int frame)
@@ -158,7 +164,8 @@ BenchData *bench_data_new(int runs)
     d->ms       = (double*)malloc(n_ms * sizeof(double));
     d->wall     = (double*)calloc((size_t)runs * SC_COUNT, sizeof(double));
     d->checksum = (BenchChecksum*)calloc((size_t)runs * SC_COUNT, sizeof(BenchChecksum));
-    if (!d->ms || !d->wall || !d->checksum) {
+    d->early    = (BenchChecksum*)calloc((size_t)runs * SC_COUNT, sizeof(BenchChecksum));
+    if (!d->ms || !d->wall || !d->checksum || !d->early) {
         bench_data_free(d);
         return NULL;
     }
@@ -172,6 +179,7 @@ void bench_data_free(BenchData *d)
     free(d->ms);
     free(d->wall);
     free(d->checksum);
+    free(d->early);
     free(d);
 }
 
@@ -200,6 +208,13 @@ void bench_data_set_checksum(BenchData *d, int run, int scenario,
 {
     if (run < 0 || run >= d->runs || scenario < 0 || scenario >= SC_COUNT) return;
     d->checksum[run * SC_COUNT + scenario] = *cs;
+}
+
+void bench_data_set_checksum_early(BenchData *d, int run, int scenario,
+                                   const BenchChecksum *cs)
+{
+    if (run < 0 || run >= d->runs || scenario < 0 || scenario >= SC_COUNT) return;
+    d->early[run * SC_COUNT + scenario] = *cs;
 }
 
 /* ------------------------------------------------------------------ */
@@ -274,14 +289,18 @@ static double scenario_fps(const BenchData *d, int sc)
     return fps;
 }
 
-/* 全回でチェックサムが 1 回目と完全に一致したか */
+static int checksum_equal(const BenchChecksum *a, const BenchChecksum *b)
+{
+    return a->count == b->count && a->sum_x == b->sum_x && a->sum_y == b->sum_y
+        && a->sum_vx == b->sum_vx && a->sum_vy == b->sum_vy;
+}
+
+/* 全回でチェックサム (早期・終了時とも) が 1 回目と完全に一致したか */
 static int checksum_stable(const BenchData *d, int sc)
 {
-    const BenchChecksum *a = &d->checksum[sc];
     for (int run = 1; run < d->runs; run++) {
-        const BenchChecksum *b = &d->checksum[run * SC_COUNT + sc];
-        if (a->count != b->count || a->sum_x != b->sum_x || a->sum_y != b->sum_y
-            || a->sum_vx != b->sum_vx || a->sum_vy != b->sum_vy)
+        if (!checksum_equal(&d->checksum[sc], &d->checksum[run * SC_COUNT + sc])
+            || !checksum_equal(&d->early[sc], &d->early[run * SC_COUNT + sc]))
             return 0;
     }
     return 1;
@@ -379,6 +398,10 @@ char *bench_data_json(const BenchData *d, const BenchMeta *meta)
         }
         sb_printf(&s, "\n      },\n");
 
+        const BenchChecksum *ce = &d->early[sc];
+        sb_printf(&s, "      \"checksum_early\": { \"frame\": %d, \"count\": %d, \"sum_x\": %.10e, "
+                      "\"sum_y\": %.10e, \"sum_vx\": %.10e, \"sum_vy\": %.10e },\n",
+                  BENCH_EARLY_FRAME, ce->count, ce->sum_x, ce->sum_y, ce->sum_vx, ce->sum_vy);
         const BenchChecksum *cs = &d->checksum[sc];
         sb_printf(&s, "      \"checksum\": { \"count\": %d, \"sum_x\": %.10e, "
                       "\"sum_y\": %.10e, \"sum_vx\": %.10e, \"sum_vy\": %.10e },\n",
@@ -428,13 +451,16 @@ char *bench_data_markdown(const BenchData *d, const BenchMeta *meta)
         sb_printf(&s, "\n");
     }
 
-    sb_printf(&s, "\n| scenario | count | sum_x | sum_y | sum_vx | sum_vy | stable |\n"
-                  "|---|---:|---:|---:|---:|---:|---|\n");
+    sb_printf(&s, "\nチェックサム (早期 = 開始から %d フレーム後、終了 = シナリオの最後)\n\n"
+                  "| scenario | count | early sum_x | early sum_y | end sum_x | end sum_y | end sum_vx | end sum_vy | stable |\n"
+                  "|---|---:|---:|---:|---:|---:|---:|---:|---|\n", BENCH_EARLY_FRAME);
     for (int sc = 0; sc < SC_COUNT; sc++) {
+        const BenchChecksum *ce = &d->early[sc];
         const BenchChecksum *cs = &d->checksum[sc];
-        sb_printf(&s, "| %s | %d | %.6e | %.6e | %.6e | %.6e | %s |\n",
-                  g_scenarios[sc].name, cs->count, cs->sum_x, cs->sum_y,
-                  cs->sum_vx, cs->sum_vy, checksum_stable(d, sc) ? "yes" : "NO");
+        sb_printf(&s, "| %s | %d | %.6e | %.6e | %.6e | %.6e | %.6e | %.6e | %s |\n",
+                  g_scenarios[sc].name, cs->count, ce->sum_x, ce->sum_y,
+                  cs->sum_x, cs->sum_y, cs->sum_vx, cs->sum_vy,
+                  checksum_stable(d, sc) ? "yes" : "NO");
     }
     return s.buf;
 }

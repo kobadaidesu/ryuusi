@@ -110,6 +110,11 @@ int main(int argc, char **argv)
                 bench_data_set(data, run, sc, BS_PACK,   f, pack);
                 bench_data_set(data, run, sc, BS_FRAME,  f, upd + pack);
                 total += upd + pack;
+                if (f + 1 == BENCH_EARLY_FRAME) {
+                    BenchChecksum ce;
+                    bench_checksum(ps, &ce);
+                    bench_data_set_checksum_early(data, run, sc, &ce);
+                }
             }
             BenchChecksum cs;
             bench_checksum(ps, &cs);

@@ -21,6 +21,7 @@
 #define BENCH_PARTICLES  300000
 #define BENCH_WARMUP     60              /* 各回の最初に捨てるフレーム数 */
 #define BENCH_MAX_FRAMES 300             /* 1 シナリオの最大フレーム数 */
+#define BENCH_EARLY_FRAME 10             /* 早期チェックサムを取るフレーム数 (カオスで誤差が育つ前) */
 
 /* 計測する段階 */
 typedef enum {
@@ -65,7 +66,8 @@ typedef struct {
 /* scenario = -1 はウォームアップ (idle と同じ入力) */
 void bench_scenario_input(int scenario, int frame, BenchInput *out);
 
-/* 位置のチェックサム: 全粒子の x, y, vx, vy を double で合計 */
+/* 位置のチェックサム: 全粒子の x, y, vx, vy を double で合計。
+ * 各シナリオの BENCH_EARLY_FRAME フレーム後 (早期) と終了時の 2 回取る */
 typedef struct {
     int    count;
     double sum_x, sum_y, sum_vx, sum_vy;
@@ -101,6 +103,8 @@ void bench_data_set(BenchData *d, int run, int scenario, BenchStage stage,
 void bench_data_set_wall(BenchData *d, int run, int scenario, double seconds);
 void bench_data_set_checksum(BenchData *d, int run, int scenario,
                              const BenchChecksum *cs);
+void bench_data_set_checksum_early(BenchData *d, int run, int scenario,
+                                   const BenchChecksum *cs);
 
 /* 複数回の結果は「回ごとの p50 / p95 の中央値」にまとめる。
  * 戻り値は malloc した文字列 (呼び出し側で free) */
