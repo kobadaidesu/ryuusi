@@ -16,6 +16,8 @@
 
 #ifdef __EMSCRIPTEN__
 #  include <emscripten.h>
+#else
+#  include <GL/glew.h>
 #endif
 
 /* make が生成する (git の short sha と、src などに未コミットの変更があるか) */
@@ -38,7 +40,8 @@ static struct {
     const char *out_path;
     const char *label;
     const char *report_url;
-} g_cfg = { 0, 1, NULL, "bench", NULL };
+    const char *shot_dir;
+} g_cfg = { 0, 1, NULL, "bench", NULL, NULL };
 
 static struct {
     Renderer  *renderer;
@@ -78,6 +81,8 @@ int bench_configure(int argc, char **argv)
             g_cfg.label = a + 14;
         } else if (strncmp(a, "--bench-report=", 15) == 0) {
             g_cfg.report_url = a + 15;
+        } else if (strncmp(a, "--bench-shot=", 13) == 0) {
+            g_cfg.shot_dir = a + 13;
         } else if (strncmp(a, "--bench", 7) == 0) {
             fprintf(stderr, "unknown option: %s\n", a);
             return -1;
@@ -226,6 +231,43 @@ static void bench_report(void)
     free(json);
     g_b.result_md = md;  /* GUI に表示し続けるので解放しない */
     gui_set_bench_text(g_b.result_md);
+}
+
+/* ------------------------------------------------------------------ */
+/*  スクリーンショット (--bench-shot、ネイティブのみ)                      */
+/*  見た目が変わっていないことを画素の比較で確かめるため (bench/imgdiff.py) */
+/* ------------------------------------------------------------------ */
+void bench_after_render(void)
+{
+#ifndef __EMSCRIPTEN__
+    if (!g_cfg.shot_dir || g_b.finished || g_b.run != 0 || g_b.scenario < 0) return;
+    const BenchScenario *s = bench_scenario(g_b.scenario);
+    if (g_b.frame != s->frames - 1) return;
+
+    GLint vp[4];
+    glGetIntegerv(GL_VIEWPORT, vp);
+    int w = vp[2], h = vp[3];
+    unsigned char *px = (unsigned char*)malloc((size_t)w * (size_t)h * 4);
+    if (!px) return;
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(vp[0], vp[1], w, h, GL_RGBA, GL_UNSIGNED_BYTE, px);
+
+    char path[512];
+    snprintf(path, sizeof(path), "%s/%s-%s.ppm", g_cfg.shot_dir, g_cfg.label, s->name);
+    FILE *f = fopen(path, "wb");
+    if (f) {
+        /* PPM (P6)。GL は下から上なので上下を反転して書く */
+        fprintf(f, "P6\n%d %d\n255\n", w, h);
+        for (int y = h - 1; y >= 0; y--)
+            for (int x = 0; x < w; x++)
+                fwrite(&px[((size_t)y * (size_t)w + (size_t)x) * 4], 1, 3, f);
+        fclose(f);
+        printf("[bench] shot %s\n", path);
+    } else {
+        fprintf(stderr, "[bench] cannot write %s\n", path);
+    }
+    free(px);
+#endif
 }
 
 /* ------------------------------------------------------------------ */

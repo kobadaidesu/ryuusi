@@ -270,6 +270,7 @@ static void main_loop_iter(void)
     double t_update1 = bench_now ? bench_now_ms() : 0.0;
 
     render_frame(g_renderer, &g_ps, g_fps, g_input.mode, &g_params);
+    if (bench_now) bench_after_render();
 
     double t_gui0 = bench_now ? bench_now_ms() : 0.0;
     {

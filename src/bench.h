@@ -17,6 +17,8 @@
  *   --bench-runs=N       繰り返す回数 (既定 1)。結果は回ごとの p50 / p95 の中央値
  *   --bench-label=name   結果に付けるラベル (既定 "bench")
  *   --bench-report=url   結果の JSON を POST する先 (ブラウザ)
+ *   --bench-shot=dir     各シナリオの最後のフレームの粒子の描画を dir/<label>-<scenario>.ppm に保存
+ *                        (ネイティブのみ。読み戻しで GPU を待つので、この指定をした回の時間は使わない)
  * 戻り値: 0 = OK、非 0 = 引数の誤り */
 int bench_configure(int argc, char **argv);
 int bench_enabled(void);
@@ -32,6 +34,9 @@ typedef enum {
 
 /* フレームの頭で呼ぶ。このフレームに与える入力を *in に書く */
 BenchFrameKind bench_begin_frame(BenchInput *in);
+
+/* render_frame の直後 (GUI を描く前) に呼ぶ。--bench-shot のときだけ画面を保存する */
+void bench_after_render(void);
 
 /* フレームの終わりで呼ぶ。stage_ms は app.c で測った段階
  * (update / gui / present / frame) の ms。pack / upload / draw / gpu は

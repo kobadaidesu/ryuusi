@@ -95,6 +95,20 @@ python3 bench/compare.py bench/results/baseline-native.json bench/results/after-
 シナリオ × 段階の「before → after (×倍率)」の表 (p50 と p95) と、上の判定によるチェックサムの一致 / 不一致を Markdown で出す。
 倍率は before / after (×2.00 なら 2 倍速い)。
 
+## スクリーンショットで見た目を比べる (ネイティブ)
+
+```sh
+mkdir -p /tmp/shots-before
+./bin/particle_flow --bench --bench-label=before --bench-shot=/tmp/shots-before
+# ... 変更してビルドし直して ...
+./bin/particle_flow --bench --bench-label=after --bench-shot=/tmp/shots-after
+python3 bench/imgdiff.py /tmp/shots-before /tmp/shots-after
+```
+
+`--bench-shot=dir` は各シナリオの最後のフレームで、粒子を描いた直後 (GUI を描く前) の画面を `dir/<label>-<scenario>.ppm` に保存する。
+入力も乱数も固定なので、描画が同じなら画素も一致する。`imgdiff.py` はシナリオごとに最大差・差のある画素数・差の平均を出す。
+読み戻しで GPU を待つので、`--bench-shot` を付けた回の時間の数字は使わない (別に走らせる)。PNG にするなら `sips -s format png x.ppm --out x.png`。
+
 ## sim_bench (物理だけのマイクロベンチ)
 
 `ps_update` + `ps_pack_gpu` だけを同じシナリオで回す。ウィンドウを開かず数秒で終わるので、ループの書き換えを試すのに使う。
