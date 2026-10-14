@@ -6,9 +6,9 @@
 **紹介サイト / Demo site: https://kobadaidesu.github.io/ryuusi/**
 
 > **動作の軽さについて / Performance note**
-> ブラウザ版はシングルスレッドで動きます(GitHub Pages では WebAssembly のマルチスレッドに必要な HTTP ヘッダーを設定できないため)。粒子を一か所に集めたときなどは重くなります。軽快に動かしたい場合は、このリポジトリを clone してネイティブ版をビルドしてください([ビルド方法](#ビルド方法--build))。ネイティブ版は `-O3 -march=native` で最適化され、ブラウザ版よりかなり軽く動きます。
+> 粒子を G キーで一か所に集めたときの重さは解消しました。同じ画素に重なりすぎた粒子は描いても見た目が変わらないので、描かないようにしています(飽和カリング)。ブラウザ版は WebAssembly の SIMD を使って最適化しています。それでもブラウザ版はシングルスレッドで動き(GitHub Pages では WebAssembly のマルチスレッドに必要な HTTP ヘッダーを設定できないため)、表示の頻度もブラウザに合わせて決まります。もっと軽快に動かしたい場合は、このリポジトリを clone してネイティブ版をビルドしてください([ビルド方法](#ビルド方法--build))。ネイティブ版は `-O3 -march=native` で最適化され、ブラウザ版より軽く動きます。計測の方法と結果は [bench/README.md](bench/README.md) と [bench/PLAN.md](bench/PLAN.md) にあります。
 >
-> The browser version runs single-threaded (GitHub Pages cannot set the HTTP headers required for WebAssembly threads), so it slows down when many particles gather. For the best performance, clone this repository and build the native version (see [Build](#ビルド方法--build)).
+> The slowdown when gathering particles with the G key has been fixed: particles that would only add to already-saturated pixels are no longer drawn (saturation culling). The browser version is built with WebAssembly SIMD. It still runs single-threaded (GitHub Pages cannot set the HTTP headers required for WebAssembly threads), and its frame rate follows the browser's display refresh. The native build is lighter still: clone this repository and build it for the best performance (see [Build](#ビルド方法--build)). Benchmarks and results are in [bench/README.md](bench/README.md) and [bench/PLAN.md](bench/PLAN.md).
 
 ## 概要 / Overview
 
@@ -127,7 +127,7 @@ On push to `main`, the workflow builds the WebAssembly version and publishes it 
 
 ブラウザ版の制約 / Browser limitations:
 
-- シングルスレッドです(GitHub Pages では pthreads に必要な HTTP ヘッダーを設定できないため)。粒子を集めたときなどに重くなります。軽快に動かしたい場合は clone してネイティブ版をビルドしてください。それでも重い場合は Params の粒子数を下げてください
+- シングルスレッドです(GitHub Pages では pthreads に必要な HTTP ヘッダーを設定できないため)。WebAssembly の SIMD を使って最適化しています。もっと軽快に動かしたい場合は clone してネイティブ版をビルドしてください。それでも重い場合は Params の粒子数を下げてください
 - 日本語フォントを同梱していないので、HUD は英語表示です
 - プリセットの保存はページを閉じると消えます
 
@@ -136,6 +136,7 @@ On push to `main`, the workflow builds the WebAssembly version and publishes it 
 ```text
 .
 ├── src/                 # Application, input, renderer, particle simulation
+├── bench/               # Benchmark tools, plan and results (bench/README.md)
 ├── third_party/imgui/   # Dear ImGui source and SDL/OpenGL backends
 ├── docs/                # Demo site and interaction videos
 │   ├── assets/images/
