@@ -14,6 +14,8 @@
 
 CC      := gcc
 CXX     := g++
+UNAME_S := $(shell uname -s)
+.DEFAULT_GOAL := all
 TARGET  := bin/particle_flow
 SRCDIR  := src
 OBJDIR  := obj
@@ -42,6 +44,12 @@ endif
 CFLAGS   := $(COMMON_FLAGS) -std=c99   $(PKG_CFLAGS) -MMD -MP
 CXXFLAGS := $(COMMON_FLAGS) -std=c++17 $(PKG_CFLAGS) -I$(SRCDIR) -I$(THIRDDIR) -I$(IMGDIR) -MMD -MP
 LIBS     := $(PKG_LIBS) -lm
+
+# macOS では OpenGL はライブラリではなく framework としてリンクする。
+# Homebrew の glew.pc にはこの指定が含まれないため、明示的に追加する。
+ifeq ($(UNAME_S),Darwin)
+    LIBS += -framework OpenGL
+endif
 
 ifeq ($(OS),Windows_NT)
     LIBS   := -lSDL2 -lSDL2main -lGLEW32 -lopengl32 -lm

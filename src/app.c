@@ -46,7 +46,7 @@ static ParticleSystem g_ps;
 static InputState     g_input;
 static SimParams      g_params = SIM_PARAMS_DEFAULT;
 static int            g_gui_visible    = 1;  /* HUD (P キー) */
-static int            g_params_visible = 0;  /* Params ウィンドウ (Tab キー) */
+static int            g_params_visible = 1;  /* 起動時に表示、Tab キーで切り替え */
 
 #define RIPPLE_SPEED 700.0f
 static RippleWave g_ripples[MAX_RIPPLES];

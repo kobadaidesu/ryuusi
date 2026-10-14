@@ -80,14 +80,13 @@ sudo apt install build-essential libsdl2-dev libglew-dev
 macOS:
 
 ```bash
-brew install sdl2 glew
+brew install sdl2 glew pkgconf
 ```
 
 ### Make
 
 ```bash
-make
-./bin/particle_flow
+make run
 ```
 
 Debug build:
