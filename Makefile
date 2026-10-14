@@ -178,10 +178,11 @@ EMCXX   := em++
 WASMDIR := $(OBJDIR)/wasm
 WASM_TARGET := bin/index.html
 
-# 最適化: -O3 と -ffast-math (ネイティブと同じ)、-msimd128 で WebAssembly SIMD
-# (128bit、f32x4) による自動ベクトル化を許し、-flto でファイルをまたいだ最適化をする。
-# ネイティブのフラグは変えない
-WASM_OPT := -O3 -ffast-math -msimd128 -flto
+# 最適化: -O3、-msimd128 で WebAssembly SIMD (128bit、f32x4) による自動ベクトル化を許し、
+# -flto でファイルをまたいだ最適化をする。ネイティブのフラグは変えない。
+# -ffast-math は付けない: 速さの差は数 % だが、丸めが変わってベンチのチェックサムが
+# before とビット単位で一致しなくなり、変更の検証が甘くなるため (bench/PLAN.md)
+WASM_OPT := -O3 -msimd128 -flto
 
 WASM_COMMON := \
     $(WASM_OPT) \
@@ -196,7 +197,7 @@ WASM_CXXFLAGS := $(WASM_COMMON) -std=c++17
 WASM_SHELL := web/shell.html
 
 # リンク時にも最適化フラグが要る(無いとデバッグ版のシステムライブラリが使われ、JS も縮小されない)。
-# -flto ではコード生成がリンク時に行われるので、-msimd128 / -ffast-math もここに要る
+# -flto ではコード生成がリンク時に行われるので、-msimd128 もここに要る
 WASM_LDFLAGS := \
     $(WASM_OPT) \
     -sUSE_SDL=2 \

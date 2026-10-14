@@ -1,0 +1,299 @@
+{
+  "label": "wasmflags-fastmath",
+  "platform": "wasm-sim",
+  "build": "89f9bb3",
+  "dirty": false,
+  "particles": 300000,
+  "size": [
+    1280,
+    720
+  ],
+  "dt": 0.016667,
+  "runs": 5,
+  "warmup_frames": 60,
+  "gpu_timer": false,
+  "cull_limit": 1024,
+  "note": "sim_bench: ps_update + ps_pack_gpu のみ (描画なし)。frame = update + pack、fps はその処理能力 / 参考: -O3 -ffast-math -msimd128 -flto でのビルド (不採用)",
+  "scenarios": [
+    {
+      "name": "idle",
+      "frames": 300,
+      "fps": 638.78,
+      "ms": {
+        "update": {
+          "p50": 0.8252,
+          "p95": 0.861
+        },
+        "pack": {
+          "p50": 0.7304,
+          "p95": 0.7636
+        },
+        "frame": {
+          "p50": 1.5615,
+          "p95": 1.6095
+        }
+      },
+      "checksum_early": {
+        "frame": 10,
+        "count": 300000,
+        "sum_x": 192173845.94,
+        "sum_y": 107897198.09,
+        "sum_vx": -501.37644698,
+        "sum_vy": 9510.5633553
+      },
+      "checksum": {
+        "count": 300000,
+        "sum_x": 192137536.09,
+        "sum_y": 107897901.99,
+        "sum_vx": -8894.2092277,
+        "sum_vy": -2549.9927189
+      },
+      "checksum_stable": true
+    },
+    {
+      "name": "attract",
+      "frames": 300,
+      "fps": 510.8,
+      "ms": {
+        "update": {
+          "p50": 1.2125,
+          "p95": 1.2678
+        },
+        "pack": {
+          "p50": 0.7315,
+          "p95": 0.7771
+        },
+        "frame": {
+          "p50": 1.9475,
+          "p95": 2.0148
+        }
+      },
+      "checksum_early": {
+        "frame": 10,
+        "count": 300000,
+        "sum_x": 192128256.85,
+        "sum_y": 107901025.87,
+        "sum_vx": -1018.2368471,
+        "sum_vy": 23217.551305
+      },
+      "checksum": {
+        "count": 300000,
+        "sum_x": 191977303.66,
+        "sum_y": 108041201.23,
+        "sum_vx": -66123.867894,
+        "sum_vy": 75857.045803
+      },
+      "checksum_stable": true
+    },
+    {
+      "name": "gather_hold",
+      "frames": 180,
+      "fps": 633.29,
+      "ms": {
+        "update": {
+          "p50": 1.2466,
+          "p95": 1.288
+        },
+        "pack": {
+          "p50": 0.2944,
+          "p95": 0.7212
+        },
+        "frame": {
+          "p50": 1.5407,
+          "p95": 1.9643
+        }
+      },
+      "checksum_early": {
+        "frame": 10,
+        "count": 300000,
+        "sum_x": 191999847.42,
+        "sum_y": 108000276.82,
+        "sum_vx": 27.837836348,
+        "sum_vy": -10.863220806
+      },
+      "checksum": {
+        "count": 300000,
+        "sum_x": 191999999.96,
+        "sum_y": 108000000.01,
+        "sum_vx": 0.001954582257,
+        "sum_vy": -0.00062087429717
+      },
+      "checksum_stable": true
+    },
+    {
+      "name": "gather_release",
+      "frames": 60,
+      "fps": 896.96,
+      "ms": {
+        "update": {
+          "p50": 0.8155,
+          "p95": 0.837
+        },
+        "pack": {
+          "p50": 0.2944,
+          "p95": 0.3071
+        },
+        "frame": {
+          "p50": 1.1108,
+          "p95": 1.1352
+        }
+      },
+      "checksum_early": {
+        "frame": 10,
+        "count": 300000,
+        "sum_x": 191999999.96,
+        "sum_y": 108000000.01,
+        "sum_vx": 0.3716585502,
+        "sum_vy": -0.11805751055
+      },
+      "checksum": {
+        "count": 300000,
+        "sum_x": 192000000.02,
+        "sum_y": 107999999.99,
+        "sum_vx": 0.3512076867,
+        "sum_vy": 0.24022309279
+      },
+      "checksum_stable": true
+    },
+    {
+      "name": "gather_release_spread",
+      "frames": 120,
+      "fps": 881.75,
+      "ms": {
+        "update": {
+          "p50": 0.8197,
+          "p95": 0.8485
+        },
+        "pack": {
+          "p50": 0.3059,
+          "p95": 0.3508
+        },
+        "frame": {
+          "p50": 1.1262,
+          "p95": 1.1911
+        }
+      },
+      "checksum_early": {
+        "frame": 10,
+        "count": 300000,
+        "sum_x": 192004991.38,
+        "sum_y": 108000000.01,
+        "sum_vx": 54318.228208,
+        "sum_vy": 0.23783333602
+      },
+      "checksum": {
+        "count": 300000,
+        "sum_x": 192637480.19,
+        "sum_y": 108000000.01,
+        "sum_vx": 621345.62426,
+        "sum_vy": 0.21296511856
+      },
+      "checksum_stable": true
+    },
+    {
+      "name": "vortex",
+      "frames": 300,
+      "fps": 442.89,
+      "ms": {
+        "update": {
+          "p50": 1.3495,
+          "p95": 1.5466
+        },
+        "pack": {
+          "p50": 0.8193,
+          "p95": 1.298
+        },
+        "frame": {
+          "p50": 2.1772,
+          "p95": 2.7244
+        }
+      },
+      "checksum_early": {
+        "frame": 10,
+        "count": 300000,
+        "sum_x": 196569399.76,
+        "sum_y": 85936997.719,
+        "sum_vx": 9969657.0588,
+        "sum_vy": -183498572.3
+      },
+      "checksum": {
+        "count": 300000,
+        "sum_x": 145326598.13,
+        "sum_y": 101520708.07,
+        "sum_vx": -19921164.4,
+        "sum_vy": -37658952.283
+      },
+      "checksum_stable": true
+    },
+    {
+      "name": "explode",
+      "frames": 60,
+      "fps": 610.57,
+      "ms": {
+        "update": {
+          "p50": 0.8897,
+          "p95": 0.9706
+        },
+        "pack": {
+          "p50": 0.7393,
+          "p95": 0.78
+        },
+        "frame": {
+          "p50": 1.6252,
+          "p95": 1.7456
+        }
+      },
+      "checksum_early": {
+        "frame": 10,
+        "count": 300000,
+        "sum_x": 142111315.23,
+        "sum_y": 95469278.471,
+        "sum_vx": -18593293.21,
+        "sum_vy": -34928107.13
+      },
+      "checksum": {
+        "count": 300000,
+        "sum_x": 135647090.42,
+        "sum_y": 70594900.199,
+        "sum_vx": 7776798.7138,
+        "sum_vy": -25525100.044
+      },
+      "checksum_stable": true
+    },
+    {
+      "name": "ripple",
+      "frames": 300,
+      "fps": 247.71,
+      "ms": {
+        "update": {
+          "p50": 3.1947,
+          "p95": 4.6568
+        },
+        "pack": {
+          "p50": 0.8478,
+          "p95": 1.0086
+        },
+        "frame": {
+          "p50": 4.0289,
+          "p95": 5.5402
+        }
+      },
+      "checksum_early": {
+        "frame": 10,
+        "count": 300000,
+        "sum_x": 137063270.05,
+        "sum_y": 66201134.195,
+        "sum_vx": 9002804.2773,
+        "sum_vy": -26925353.214
+      },
+      "checksum": {
+        "count": 300000,
+        "sum_x": 150062811.32,
+        "sum_y": 29502894.441,
+        "sum_vx": 7921719.8571,
+        "sum_vy": -2509299.351
+      },
+      "checksum_stable": true
+    }
+  ]
+}
