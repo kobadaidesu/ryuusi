@@ -18,6 +18,7 @@
 
 #ifdef __EMSCRIPTEN__
 #  include <emscripten.h>
+#  include <emscripten/html5.h>
 #  include <GLES3/gl3.h>
 #else
 #  include <GL/glew.h>
@@ -87,10 +88,24 @@ int app_init(void)
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 
+    int win_w = WIN_W, win_h = WIN_H;
+#ifdef __EMSCRIPTEN__
+    /* ブラウザではキャンバスの CSS 上の大きさ(= 画面いっぱい)でウィンドウを作る。
+     * WIN_W×WIN_H で作ると最初のフレームでキャンバスだけが広がり、粒子が元の範囲に留まる */
+    {
+        double css_w = 0.0, css_h = 0.0;
+        if (emscripten_get_element_css_size("#canvas", &css_w, &css_h) == EMSCRIPTEN_RESULT_SUCCESS
+            && css_w > 0.0 && css_h > 0.0) {
+            win_w = (int)css_w;
+            win_h = (int)css_h;
+        }
+    }
+#endif
+
     g_window = SDL_CreateWindow(
         WINDOW_TITLE,
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        WIN_W, WIN_H,
+        win_w, win_h,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (!g_window) {
         fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
@@ -108,7 +123,7 @@ int app_init(void)
 
     SDL_GL_SetSwapInterval(VSYNC_ON);
 
-    g_renderer = render_init(WIN_W, WIN_H);
+    g_renderer = render_init(win_w, win_h);
     if (!g_renderer) {
         fprintf(stderr, "render_init failed\n");
         SDL_GL_DeleteContext(g_glctx);
@@ -119,7 +134,7 @@ int app_init(void)
 
     gui_init(g_window, g_glctx);
 
-    ps_init(&g_ps, WIN_W, WIN_H, &g_params);
+    ps_init(&g_ps, win_w, win_h, &g_params);
     input_init(&g_input);
 
     printf("Particle slots: %d\n", MAX_PARTICLES);
