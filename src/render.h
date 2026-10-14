@@ -31,9 +31,6 @@ void render_resize(Renderer *r, int win_w, int win_h);
 /* 飽和カリングの上限 (既定 PS_CULL_LIMIT_DEFAULT、0 で無効) */
 void render_set_cull_limit(Renderer *r, int limit);
 
-/* (比較用) 0 = 位置と色を詰めて送る、1 = 番号で描く */
-void render_set_color_path(Renderer *r, int path);
-
 /* OpenGL リソース解放 */
 void render_shutdown(Renderer *r);
 

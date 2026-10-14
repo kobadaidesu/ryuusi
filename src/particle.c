@@ -495,16 +495,3 @@ int ps_pack_positions(const ParticleSystem *ps, float *pos, uint8_t (*col)[4],
     }
     return m;
 }
-
-int ps_cull_indices(const ParticleSystem *ps, uint32_t *idx, const PackCull *cull)
-{
-    const int n = ps->count;
-    if (!cull_begin(cull)) return n;
-    const unsigned limit = cull_limit(cull);
-    int m = 0;
-    for (int i = 0; i < n; i++) {
-        if (!cull_keep(cull, limit, ps->x[i], ps->y[i])) continue;
-        idx[m++] = (uint32_t)i;
-    }
-    return m;
-}

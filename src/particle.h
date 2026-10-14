@@ -109,17 +109,13 @@ typedef struct {
 } PackCull;
 
 /* 描画用のパック (render.c から呼ぶ)。色は ps->color にあるので、毎フレーム作るのは位置だけ。
- *
- * ps_pack_positions: 描く粒子の位置 (float x, y の組) を pos に詰めて書く。
- *   カリングで間引いたときは、位置と色の並びを合わせるため、色も col に詰めて書く
- *   (間引かなかったときは col に書かない。ps->color をそのまま使える)。
- * ps_cull_indices: 描く粒子の番号を idx に書く (位置と色は ps の配列のまま使う)。
- *
- * どちらも戻り値は描く粒子の数。ps->count と同じなら何も間引いていない。
+ * 描く粒子の位置 (float x, y の組) を pos に詰めて書く。
+ * カリングで間引いたときは、位置と色の並びを合わせるため、色も col に詰めて書く
+ * (間引かなかったときは col に書かない。ps->color をそのまま使える)。
+ * 戻り値は描く粒子の数。ps->count と同じなら何も間引いていない。
  * cull が NULL か無効なら間引かない */
 int ps_pack_positions(const ParticleSystem *ps, float *pos, uint8_t (*col)[4],
                       const PackCull *cull);
-int ps_cull_indices(const ParticleSystem *ps, uint32_t *idx, const PackCull *cull);
 
 
 #endif /* PARTICLE_H */
