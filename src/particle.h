@@ -55,8 +55,8 @@ typedef struct {
     /* --- 基本色相 (0..1、粒子ごとに固有) --- */
     float hue[MAX_PARTICLES];
 
-    /* --- 質量(速度応答の係数) --- */
-    float mass[MAX_PARTICLES];
+    /* --- 質量の逆数 (速度応答の係数)。質量は 0.5〜2 で、力 / 質量 を掛け算にするため逆数で持つ --- */
+    float inv_mass[MAX_PARTICLES];
 
     /* --- アクティブ粒子数 --- */
     int count;
