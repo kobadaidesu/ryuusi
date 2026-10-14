@@ -10,8 +10,13 @@
 
 #include "render.h"
 #include "sim_params.h"
+#include "bench_core.h"  /* bench_now_ms */
 #ifdef __EMSCRIPTEN__
 #  include <GLES3/gl3.h>
+#  include <emscripten/html5.h>
+/* EXT_disjoint_timer_query_webgl2 の定数 (GLES3 のヘッダには無い) */
+#  define GL_TIME_ELAPSED     0x88BF
+#  define GL_GPU_DISJOINT_EXT 0x8FBB
 #else
 #  include <GL/glew.h>
 #endif
@@ -60,6 +65,9 @@ static const char *FRAG_SRC =
     "    frag_color = vec4(v_color.rgb * fade, v_color.a * fade);\n"
     "}\n";
 
+/* GPU 計測の結果は数フレーム遅れて読む (待つとストールするため) */
+#define PROF_QUERIES 8
+
 /* ------------------------------------------------------------------ */
 /*  レンダラ内部構造体                                                   */
 /* ------------------------------------------------------------------ */
@@ -72,6 +80,16 @@ struct Renderer {
     GpuVertex *staging; /* CPU ステージングバッファ */
 
     int win_w, win_h;
+
+    /* ---- ベンチマーク用の計測 (render_profile_enable 後のみ) ---- */
+    int    prof;                       /* 計測中か                     */
+    int    prof_gpu;                   /* GPU タイマーが使えるか         */
+    int    prof_tag;                   /* 次の GPU 計測に付ける番号      */
+    RenderCpuTimes prof_cpu;           /* 直前のフレームの CPU 側の時間  */
+    GLuint prof_q[PROF_QUERIES];       /* GL_TIME_ELAPSED のクエリ (リング) */
+    int    prof_q_tag[PROF_QUERIES];
+    int    prof_head;                  /* 次に読むクエリ                 */
+    int    prof_pending;               /* 結果をまだ読んでいない数        */
 };
 
 /* ------------------------------------------------------------------ */
@@ -212,16 +230,27 @@ void render_frame(Renderer *r,
                   InteractMode mode,
                   const SimParams *params)
 {
+    /* ベンチマーク計測: リングに空きがあれば GPU 計測を始める */
+    int q = -1;
+    if (r->prof && r->prof_gpu && r->prof_pending < PROF_QUERIES) {
+        q = (r->prof_head + r->prof_pending) % PROF_QUERIES;
+        r->prof_q_tag[q] = r->prof_tag;
+        glBeginQuery(GL_TIME_ELAPSED, r->prof_q[q]);
+    }
+    double t0 = r->prof ? bench_now_ms() : 0.0;
+
     glClear(GL_COLOR_BUFFER_BIT);
 
     /* ---- CPU→GPU 転送 ---- */
     int n = ps_pack_gpu(ps, r->staging, MAX_PARTICLES);
+    double t1 = r->prof ? bench_now_ms() : 0.0;
 
     glBindBuffer(GL_ARRAY_BUFFER, r->vbo);
     /* glBufferSubData: リアロケなし、既存バッファへの部分更新 */
     glBufferSubData(GL_ARRAY_BUFFER, 0,
                     (GLsizeiptr)(n * sizeof(GpuVertex)),
                     r->staging);
+    double t2 = r->prof ? bench_now_ms() : 0.0;
 
     /* ---- 描画 ---- */
     glUseProgram(r->prog);
@@ -231,6 +260,17 @@ void render_frame(Renderer *r,
     glBindVertexArray(r->vao);
     glDrawArrays(GL_POINTS, 0, n);       /* 1回の API コールで全粒子描画 */
     glBindVertexArray(0);
+
+    if (r->prof) {
+        double t3 = bench_now_ms();
+        r->prof_cpu.pack_ms   = t1 - t0;
+        r->prof_cpu.upload_ms = t2 - t1;
+        r->prof_cpu.draw_ms   = t3 - t2;
+        if (q >= 0) {
+            glEndQuery(GL_TIME_ELAPSED);
+            r->prof_pending++;
+        }
+    }
 
     (void)fps;
     (void)mode;
@@ -255,6 +295,74 @@ void render_shutdown(Renderer *r)
     glDeleteVertexArrays(1, &r->vao);
     glDeleteBuffers(1, &r->vbo);
     glDeleteProgram(r->prog);
+    if (r->prof_gpu) glDeleteQueries(PROF_QUERIES, r->prof_q);
     free(r->staging);
     free(r);
+}
+
+/* ------------------------------------------------------------------ */
+/*  ベンチマーク用の計測                                                 */
+/* ------------------------------------------------------------------ */
+int render_profile_enable(Renderer *r)
+{
+    r->prof = 1;
+#ifdef __EMSCRIPTEN__
+    /* WebGL2 では拡張を有効にできたときだけ使える (Safari などは非対応) */
+    r->prof_gpu = emscripten_webgl_enable_extension(
+        emscripten_webgl_get_current_context(),
+        "EXT_disjoint_timer_query_webgl2") ? 1 : 0;
+#else
+    /* GL 3.3 Core ではタイマークエリは標準機能 */
+    r->prof_gpu = (GLEW_VERSION_3_3 || GLEW_ARB_timer_query) ? 1 : 0;
+#endif
+    if (r->prof_gpu) {
+        glGenQueries(PROF_QUERIES, r->prof_q);
+        /* 生成直後のエラーなどで使えないなら諦める */
+        if (glGetError() != GL_NO_ERROR) r->prof_gpu = 0;
+    }
+    r->prof_head    = 0;
+    r->prof_pending = 0;
+    return r->prof_gpu;
+}
+
+void render_profile_set_tag(Renderer *r, int tag)
+{
+    r->prof_tag = tag;
+}
+
+void render_profile_cpu(const Renderer *r, RenderCpuTimes *out)
+{
+    *out = r->prof_cpu;
+}
+
+int render_profile_poll_gpu(Renderer *r, int wait, int *tag, double *ms)
+{
+    if (!r->prof_gpu || r->prof_pending == 0) return 0;
+
+    GLuint id = r->prof_q[r->prof_head];
+    GLuint available = 0;
+    glGetQueryObjectuiv(id, GL_QUERY_RESULT_AVAILABLE, &available);
+    if (!available && !wait) return 0;
+
+    double ns;
+#ifdef __EMSCRIPTEN__
+    /* WebGL では 32 bit で受ける (4 秒までなので十分) */
+    GLuint v = 0;
+    glGetQueryObjectuiv(id, GL_QUERY_RESULT, &v);
+    ns = (double)v;
+    /* 計測中に GPU の状態が飛んだ (disjoint) なら値は信用できない */
+    GLint disjoint = 0;
+    glGetIntegerv(GL_GPU_DISJOINT_EXT, &disjoint);
+    if (disjoint) ns = -1.0;
+#else
+    GLuint64 v = 0;
+    glGetQueryObjectui64v(id, GL_QUERY_RESULT, &v);
+    ns = (double)v;
+#endif
+
+    *tag = r->prof_q_tag[r->prof_head];
+    *ms  = ns >= 0.0 ? ns * 1e-6 : -1.0;
+    r->prof_head = (r->prof_head + 1) % PROF_QUERIES;
+    r->prof_pending--;
+    return 1;
 }

@@ -6,12 +6,14 @@
  */
 
 #include "app.h"
+#include "bench.h"
 #include <stdlib.h>
 
 int main(int argc, char *argv[])
 {
-    (void)argc;
-    (void)argv;
+    /* --bench などの計測モードの引数 (ブラウザでは Module.arguments) */
+    if (bench_configure(argc, argv) != 0)
+        return EXIT_FAILURE;
 
     if (app_init() != 0)
         return EXIT_FAILURE;

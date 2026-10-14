@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(APP_SOURCES
     src/app.c
+    src/bench.c
+    src/bench_core.c
     src/input.c
     src/main.c
     src/particle.c

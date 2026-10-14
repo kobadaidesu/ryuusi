@@ -15,6 +15,7 @@
 #include "input.h"
 #include "gui.h"
 #include "sim_params.h"
+#include "bench.h"
 
 #ifdef __EMSCRIPTEN__
 #  include <emscripten.h>
@@ -89,10 +90,20 @@ int app_init(void)
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 
     int win_w = WIN_W, win_h = WIN_H;
+    Uint32 win_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
+    if (bench_enabled()) {
+        /* 計測モードは 1280×720 に固定 */
+        win_w = BENCH_W;
+        win_h = BENCH_H;
+        win_flags &= ~(Uint32)SDL_WINDOW_RESIZABLE;
+#ifdef __EMSCRIPTEN__
+        emscripten_set_element_css_size("#canvas", BENCH_W, BENCH_H);
+#endif
+    }
 #ifdef __EMSCRIPTEN__
     /* ブラウザではキャンバスの CSS 上の大きさ(= 画面いっぱい)でウィンドウを作る。
      * WIN_W×WIN_H で作ると最初のフレームでキャンバスだけが広がり、粒子が元の範囲に留まる */
-    {
+    if (!bench_enabled()) {
         double css_w = 0.0, css_h = 0.0;
         if (emscripten_get_element_css_size("#canvas", &css_w, &css_h) == EMSCRIPTEN_RESULT_SUCCESS
             && css_w > 0.0 && css_h > 0.0) {
@@ -106,7 +117,7 @@ int app_init(void)
         WINDOW_TITLE,
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         win_w, win_h,
-        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+        win_flags);
     if (!g_window) {
         fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
         SDL_Quit();
@@ -121,7 +132,8 @@ int app_init(void)
         return -1;
     }
 
-    SDL_GL_SetSwapInterval(VSYNC_ON);
+    /* 計測モードは VSync を切る (ブラウザは rAF 縛りなので効かない) */
+    SDL_GL_SetSwapInterval(bench_enabled() ? 0 : VSYNC_ON);
 
     g_renderer = render_init(win_w, win_h);
     if (!g_renderer) {
@@ -137,6 +149,12 @@ int app_init(void)
     ps_init(&g_ps, win_w, win_h, &g_params);
     input_init(&g_input);
 
+    if (bench_enabled()) {
+        int w, h;
+        SDL_GetWindowSize(g_window, &w, &h);
+        bench_start(g_renderer, w, h);
+    }
+
     printf("Particle slots: %d\n", MAX_PARTICLES);
     printf("Initial count : %d\n", g_ps.count);
     return 0;
@@ -151,13 +169,44 @@ static float  g_fps        = 0.0f;
 static int    g_frame_count = 0;
 static Uint64 g_fps_timer;
 
+/* 計測モード: 新しい回の頭で、乱数・パラメータ・粒子・波紋を毎回同じ状態に戻す */
+static void bench_reset_state(void)
+{
+    static const SimParams def = SIM_PARAMS_DEFAULT;
+    g_params = def;
+    g_params.particle_count = BENCH_PARTICLES;
+    g_ripple_count = 0;
+    ps_seed(BENCH_SEED);
+    ps_reset(&g_ps, &g_params);
+}
+
 static void main_loop_iter(void)
 {
+    double t_frame0 = bench_enabled() ? bench_now_ms() : 0.0;
+
+    /* 計測モード中はシナリオの入力を使い、dt を固定する */
+    int bench_now = 0;
+    if (bench_enabled()) {
+        BenchInput bi;
+        BenchFrameKind bk = bench_begin_frame(&bi);
+        if (bk == BENCH_FRAME_DONE) {
+#ifndef __EMSCRIPTEN__
+            g_input.should_quit = 1;  /* ネイティブは結果を出したら終了 */
+#endif
+            /* ブラウザは結果を表示したまま通常の操作に戻る */
+        } else {
+            bench_now = 1;
+            input_process_bench(&g_input, &bi);
+            if (bk == BENCH_FRAME_RESET) bench_reset_state();
+        }
+    }
+
     gui_new_frame();
 
-    input_process_ex(&g_input,
-                     gui_wants_mouse(),
-                     gui_wants_keyboard());
+    if (!bench_now)
+        input_process_ex(&g_input,
+                         gui_wants_mouse(),
+                         gui_wants_keyboard());
 
     if (g_input.do_toggle_gui)    g_gui_visible    = !g_gui_visible;
     if (g_input.do_toggle_params) g_params_visible = !g_params_visible;
@@ -167,6 +216,7 @@ static void main_loop_iter(void)
     g_prev = now;
     if (dt > 0.05f)  dt = 0.05f;
     if (dt < 0.001f) dt = 0.001f;
+    if (bench_now) dt = BENCH_DT;
 
     if (g_input.do_reset)
         ps_reset(&g_ps, &g_params);
@@ -207,6 +257,8 @@ static void main_loop_iter(void)
         }
     }
 
+    double t_update0 = bench_now ? bench_now_ms() : 0.0;
+
     ps_update(&g_ps, dt,
               g_input.mouse_x, g_input.mouse_y,
               g_input.mode, g_input.mode_active,
@@ -215,17 +267,34 @@ static void main_loop_iter(void)
               g_ripples, g_ripple_count,
               &g_params);
 
+    double t_update1 = bench_now ? bench_now_ms() : 0.0;
+
     render_frame(g_renderer, &g_ps, g_fps, g_input.mode, &g_params);
 
+    double t_gui0 = bench_now ? bench_now_ms() : 0.0;
     {
         int gr = gui_render(&g_params, g_gui_visible, g_params_visible,
                             g_fps, g_ps.count, (int)g_input.mode,
                             g_input.timestop_on);
-        if (gr & 1) ps_reset(&g_ps, &g_params);
-        if (gr & 2) ps_recolor(&g_ps, &g_params);
+        /* 計測中は GUI からの再配置・色替えを受け付けない (再現性のため) */
+        if (!bench_now) {
+            if (gr & 1) ps_reset(&g_ps, &g_params);
+            if (gr & 2) ps_recolor(&g_ps, &g_params);
+        }
     }
+    double t_gui1 = bench_now ? bench_now_ms() : 0.0;
 
     SDL_GL_SwapWindow(g_window);
+
+    if (bench_now) {
+        double t_end = bench_now_ms();
+        double ms[BS_COUNT] = { 0 };
+        ms[BS_UPDATE]  = t_update1 - t_update0;
+        ms[BS_GUI]     = t_gui1 - t_gui0;
+        ms[BS_PRESENT] = t_end - t_gui1;
+        ms[BS_FRAME]   = t_end - t_frame0;
+        bench_end_frame(ms, &g_ps);
+    }
 
     g_frame_count++;
     Uint64 elapsed = now - g_fps_timer;

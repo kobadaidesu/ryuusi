@@ -110,3 +110,28 @@ void input_process_ex(InputState *in, int block_mouse, int block_keyboard)
         in->mode_active = 0;
     }
 }
+
+void input_process_bench(InputState *in, const BenchInput *bi)
+{
+    SDL_Event ev;
+    while (SDL_PollEvent(&ev)) {
+        if (ev.type == SDL_QUIT)
+            in->should_quit = 1;
+        else if (ev.type == SDL_KEYDOWN
+                 && (ev.key.keysym.sym == SDLK_ESCAPE || ev.key.keysym.sym == SDLK_q))
+            in->should_quit = 1;
+    }
+
+    in->do_reset         = 0;
+    in->do_fullscreen    = 0;
+    in->do_toggle_gui    = 0;
+    in->do_toggle_params = 0;
+
+    in->mouse_x     = bi->mouse_x;
+    in->mouse_y     = bi->mouse_y;
+    in->mode        = bi->mode;
+    in->mode_active = bi->mode_active;
+    in->gather_on   = bi->gather_on;
+    in->timestop_on = bi->timestop_on;
+    in->do_ripple   = bi->do_ripple;
+}

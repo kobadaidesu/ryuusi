@@ -69,6 +69,23 @@
       color: #aaa;
       pointer-events: auto;
     }
+    /* 計測モード (?bench=1): キャンバスを 1280×720 に固定し、下に結果を出す */
+    body.bench {
+      overflow: auto;
+      height: auto;
+    }
+    body.bench #canvas {
+      width: 1280px;
+      height: 720px;
+    }
+    body.bench #hint {
+      display: none;
+    }
+    #bench-status {
+      margin: 12px 12px 0;
+      font: 12px/1.4 ui-monospace, monospace;
+      color: #8f8;
+    }
   </style>
 </head>
 <body>
@@ -105,6 +122,18 @@
         console.error(text);
       }
     };
+
+    // 計測モード: app/?bench=1[&report=URL][&label=name][&runs=N]
+    // 引数は main(argc, argv) に渡り、src/bench.c が読む
+    (function () {
+      var q = new URLSearchParams(location.search);
+      if (q.get('bench') !== '1') return;
+      document.body.classList.add('bench');
+      var args = ['--bench', '--bench-label=' + (q.get('label') || 'bench')];
+      if (q.get('runs')) args.push('--bench-runs=' + q.get('runs'));
+      if (q.get('report')) args.push('--bench-report=' + q.get('report'));
+      Module.arguments = args;
+    })();
 
     // クリックでキャンバスにフォーカスを戻す(キー操作を受けるため)
     Module.canvas.addEventListener('mousedown', function () { Module.canvas.focus(); });
