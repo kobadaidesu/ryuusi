@@ -151,7 +151,9 @@ WASM_CXXFLAGS := $(WASM_COMMON) -std=c++17
 # web/shell.html を元に bin/index.html を作る(キャンバスを画面いっぱいにするページ)
 WASM_SHELL := web/shell.html
 
+# リンク時にも -O2 が要る(無いとデバッグ版のシステムライブラリが使われ、JS も縮小されない)
 WASM_LDFLAGS := \
+    -O2 \
     -sUSE_SDL=2 \
     -sUSE_WEBGL2=1 \
     -sFULL_ES3=1 \
