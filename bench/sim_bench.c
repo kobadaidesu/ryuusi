@@ -1,4 +1,4 @@
-/*  sim_bench.c  –  SDL / OpenGL なしで ps_update + ps_pack_gpu だけを回すマイクロベンチ
+/*  sim_bench.c  –  SDL / OpenGL なしで ps_update + 位置のパック だけを回すマイクロベンチ
  *
  *  アプリの計測モード (src/bench.c) と同じシナリオ・同じ固定 dt・同じ乱数の種で
  *  物理だけを回す。ウィンドウを開かないので数秒で終わり、ループの書き換えを
@@ -34,8 +34,9 @@
 /* app.c の main_loop_iter と同じ順で 1 フレーム進める。ms[] に段階ごとの時間 */
 /* 飽和カリング (アプリの Renderer と同じく 1280x720 の画素ごとのカウント) */
 static PackCull g_cull = { NULL, BENCH_W, BENCH_H, PS_CULL_LIMIT_DEFAULT };
+static uint8_t (*g_col)[4];  /* 間引いたときに詰める色 */
 
-static void step(ParticleSystem *ps, GpuVertex *staging, const SimParams *params,
+static void step(ParticleSystem *ps, float *staging, const SimParams *params,
                  RippleWave *ripples, int *ripple_count, const BenchInput *in,
                  double *update_ms, double *pack_ms)
 {
@@ -60,7 +61,7 @@ static void step(ParticleSystem *ps, GpuVertex *staging, const SimParams *params
     ps_update(ps, dt, in->mouse_x, in->mouse_y, in->mode, in->mode_active,
               in->timestop_on, in->gather_on, ripples, *ripple_count, params);
     double t1 = bench_now_ms();
-    ps_pack_gpu(ps, staging, MAX_PARTICLES, &g_cull);
+    ps_pack_positions(ps, staging, g_col, &g_cull);
     double t2 = bench_now_ms();
 
     *update_ms = t1 - t0;
@@ -82,9 +83,10 @@ int main(int argc, char **argv)
     if (runs < 1) runs = 1;
 
     ParticleSystem *ps = (ParticleSystem*)malloc(sizeof(ParticleSystem));
-    GpuVertex *staging = (GpuVertex*)malloc(MAX_PARTICLES * sizeof(GpuVertex));
+    float *staging = (float*)malloc((size_t)MAX_PARTICLES * 2 * sizeof(float));
     BenchData *data    = bench_data_new(runs);
     g_cull.counts      = (uint16_t*)malloc((size_t)BENCH_W * BENCH_H * sizeof(uint16_t));
+    g_col              = (uint8_t(*)[4])malloc((size_t)MAX_PARTICLES * 4);
     if (!ps || !staging || !data || !g_cull.counts) { fprintf(stderr, "out of memory\n"); return 1; }
 
     SimParams params = SIM_PARAMS_DEFAULT;
@@ -142,7 +144,7 @@ int main(int argc, char **argv)
     meta.height     = BENCH_H;
     meta.gpu_timer  = 0;
     meta.gpu_renderer = NULL;
-    meta.note       = "sim_bench: ps_update + ps_pack_gpu のみ (描画なし)。frame = update + pack、fps はその処理能力";
+    meta.note       = "sim_bench: ps_update + 位置のパック のみ (描画なし)。frame = update + pack、fps はその処理能力";
     meta.cull_limit = g_cull.limit;
     meta.stage_mask = BENCH_STAGE_BIT(BS_UPDATE) | BENCH_STAGE_BIT(BS_PACK)
                     | BENCH_STAGE_BIT(BS_FRAME);
@@ -163,6 +165,7 @@ int main(int argc, char **argv)
 
     bench_data_free(data);
     free(g_cull.counts);
+    free(g_col);
     free(staging);
     free(ps);
     return 0;

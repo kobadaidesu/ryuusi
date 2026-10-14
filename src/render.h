@@ -17,7 +17,7 @@ Renderer *render_init(int win_w, int win_h);
 
 /* 1フレーム描画:
  *   1) 画面クリア
- *   2) ps_pack_gpu → VBO 転送 → glDrawArrays
+ *   2) 位置のパック → VBO 転送 → glDrawArrays
  *   3) FPS テキスト(デバッグ用; 必要なら ImGui で置換可)     */
 void render_frame(Renderer *r,
                   const ParticleSystem *ps,
@@ -31,6 +31,9 @@ void render_resize(Renderer *r, int win_w, int win_h);
 /* 飽和カリングの上限 (既定 PS_CULL_LIMIT_DEFAULT、0 で無効) */
 void render_set_cull_limit(Renderer *r, int limit);
 
+/* (比較用) 0 = 位置と色を詰めて送る、1 = 番号で描く */
+void render_set_color_path(Renderer *r, int path);
+
 /* OpenGL リソース解放 */
 void render_shutdown(Renderer *r);
 
@@ -38,7 +41,7 @@ void render_shutdown(Renderer *r);
  *  ベンチマーク用の計測 (render_profile_enable を呼ばない限り何もしない)
  * ------------------------------------------------------------------ */
 typedef struct {
-    double pack_ms;    /* ps_pack_gpu                  */
+    double pack_ms;    /* 位置のパック / カリング       */
     double upload_ms;  /* glBufferSubData (CPU 側)     */
     double draw_ms;    /* glDrawArrays 呼び出し (CPU 側) */
 } RenderCpuTimes;

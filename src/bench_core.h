@@ -26,7 +26,7 @@
 /* 計測する段階 */
 typedef enum {
     BS_UPDATE = 0,  /* ps_update                         */
-    BS_PACK,        /* ps_pack_gpu                       */
+    BS_PACK,        /* 位置のパック / カリング            */
     BS_UPLOAD,      /* glBufferSubData (CPU 側)          */
     BS_DRAW,        /* glDrawArrays の呼び出し (CPU 側)   */
     BS_GUI,         /* gui_render                        */

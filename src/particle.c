@@ -48,6 +48,33 @@ static inline void hsv2rgb(float h, float s, float v,
     }
 }
 
+/* 粒子 i の描画色 (RGBA8) を色相と寿命から作る。
+ * 寿命に応じて明度を変える: 誕生 → 明るい, 消える → 暗い。alpha = 寿命。
+ * 寿命は今は常に 1 (LIFE_DECAY = 0) なので、色は生成・再配置・色替えのときだけ変わる。
+ * 寿命が変わる経路を作ったら、そこでもこの関数で色を作り直し color_version を上げること */
+static inline uint8_t unorm8(float v)
+{
+    if (v <= 0.0f) return 0;
+    if (v >= 1.0f) return 255;
+    return (uint8_t)(v * 255.0f + 0.5f);
+}
+
+static void update_colors(ParticleSystem *ps, int from, int to)
+{
+    for (int i = from; i < to; i++) {
+        float life = ps->life[i];
+        float val  = life * 1.4f;
+        if (val > 1.0f) val = 1.0f;
+        float r, g, b;
+        hsv2rgb(ps->hue[i], 0.8f, val, &r, &g, &b);
+        ps->color[i][0] = unorm8(r);
+        ps->color[i][1] = unorm8(g);
+        ps->color[i][2] = unorm8(b);
+        ps->color[i][3] = unorm8(life);
+    }
+    if (to > from) ps->color_version++;
+}
+
 /* ------------------------------------------------------------------ */
 /*  ps_init                                                             */
 /* ------------------------------------------------------------------ */
@@ -75,6 +102,7 @@ void ps_init(ParticleSystem *ps, int win_w, int win_h, const SimParams *params)
         ps->inv_mass[i] = 1.0f / frand_range(0.5f, 2.0f);
         ps->count++;
     }
+    update_colors(ps, 0, ps->count);
 }
 
 /* ------------------------------------------------------------------ */
@@ -84,6 +112,7 @@ void ps_spawn(ParticleSystem *ps, float cx, float cy, int count,
               const SimParams *params)
 {
     int added = 0;
+    int first = ps->count;
     int cap = params->particle_count;
     if (cap < 1) cap = 1;
     if (cap > MAX_PARTICLES) cap = MAX_PARTICLES;
@@ -105,6 +134,7 @@ void ps_spawn(ParticleSystem *ps, float cx, float cy, int count,
         ps->count++;
         added++;
     }
+    update_colors(ps, first, ps->count);
 }
 
 /* ------------------------------------------------------------------ */
@@ -130,8 +160,10 @@ static void ps_remove_dead(ParticleSystem *ps)
         ps->life[i]     = ps->life[last];
         ps->hue[i]      = ps->hue[last];
         ps->inv_mass[i] = ps->inv_mass[last];
+        memcpy(ps->color[i], ps->color[last], 4);
         ps->count--;
     }
+    ps->color_version++;
 }
 
 /* f と上限 cap の小さい方。fminf と違って NaN を考えないので比較 1 回 (SIMD の min) になる */
@@ -345,6 +377,11 @@ void ps_update(ParticleSystem *ps,
             L[i] = min_cap(L[i] + 0.1f, 1.0f);
     }
 
+    /* ---- 寿命が変わる経路 (LIFE_DECAY > 0) では、明るさと alpha も変わるので色を作り直す。
+     *      今は寿命が常に 1 なので通らない (爆発の回復も 1 で頭打ち) ---- */
+    if (LIFE_DECAY > 0.0f)
+        update_colors(ps, 0, ps->count);
+
     /* ---- マウス位置でスポーン (MODE_SPAWN) ---- */
     if (mode_active && mode == MODE_SPAWN) {
         ps_spawn(ps, mx, my, SPAWN_PER_FRAME, params);
@@ -390,6 +427,7 @@ void ps_reset(ParticleSystem *ps, const SimParams *params)
         ps->inv_mass[i] = 1.0f / frand_range(0.5f, 2.0f);
         ps->count++;
     }
+    update_colors(ps, 0, ps->count);
 }
 
 /* ------------------------------------------------------------------ */
@@ -400,60 +438,73 @@ void ps_recolor(ParticleSystem *ps, const SimParams *params)
     for (int i = 0; i < ps->count; i++) {
         ps->hue[i] = frand_range(params->hue_min, params->hue_max);
     }
+    update_colors(ps, 0, ps->count);
 }
 
 /* ------------------------------------------------------------------ */
-/*  ps_pack_gpu  –  SoA → インターリーブ GPU 頂点へ変換                 */
-/*  戻り値: 書き込んだ頂点数                                             */
+/*  描画用のパック                                                       */
 /* ------------------------------------------------------------------ */
-static inline void pack_vertex(const ParticleSystem *ps, int i, GpuVertex *o)
+
+/* 飽和カリングの準備 (カウントを 0 に戻す)。無効なら 0 を返す */
+static int cull_begin(const PackCull *cull)
 {
-    float life = ps->life[i];
-    /* 寿命に応じて彩度・明度を変化させる: 誕生 → 明るい, 消える → 暗い */
-    float sat  = 0.8f;
-    float val  = life * 1.4f;
-    if (val > 1.0f) val = 1.0f;
-
-    float r, g, b;
-    hsv2rgb(ps->hue[i], sat, val, &r, &g, &b);
-
-    o->x = ps->x[i];
-    o->y = ps->y[i];
-    o->r = r;
-    o->g = g;
-    o->b = b;
-    o->a = life;
+    if (!cull || !cull->counts || cull->limit <= 0 || cull->w <= 0 || cull->h <= 0)
+        return 0;
+    memset(cull->counts, 0, (size_t)cull->w * (size_t)cull->h * sizeof(uint16_t));
+    return 1;
 }
 
-int ps_pack_gpu(const ParticleSystem *ps, GpuVertex *out, int max_out,
-                const PackCull *cull)
+/* 中心画素のカウントが上限未満なら数えて 1 (描く)、上限に達していたら 0 (描かない) */
+static inline int cull_keep(const PackCull *cull, unsigned limit, float x, float y)
 {
-    int n = ps->count;
-    if (n > max_out) n = max_out;
+    const int w = cull->w, h = cull->h;
+    int px = (int)x;
+    int py = (int)y;
+    if (px < 0) px = 0; else if (px >= w) px = w - 1;
+    if (py < 0) py = 0; else if (py >= h) py = h - 1;
+    uint16_t *c = &cull->counts[(size_t)py * (size_t)w + (size_t)px];
+    if (*c >= limit) return 0;   /* この画素はもう飽和している */
+    (*c)++;
+    return 1;
+}
 
-    if (!cull || !cull->counts || cull->limit <= 0 || cull->w <= 0 || cull->h <= 0) {
-        for (int i = 0; i < n; i++)
-            pack_vertex(ps, i, &out[i]);
+static unsigned cull_limit(const PackCull *cull)
+{
+    return cull->limit > 65535 ? 65535u : (unsigned)cull->limit;
+}
+
+int ps_pack_positions(const ParticleSystem *ps, float *pos, uint8_t (*col)[4],
+                      const PackCull *cull)
+{
+    const int n = ps->count;
+    if (!cull_begin(cull)) {
+        for (int i = 0; i < n; i++) {
+            pos[2 * i]     = ps->x[i];
+            pos[2 * i + 1] = ps->y[i];
+        }
         return n;
     }
-
-    /* ---- 飽和カリング: 中心画素ごとに limit 個まで ---- */
-    const int w = cull->w, h = cull->h;
-    const unsigned limit = cull->limit > 65535 ? 65535u : (unsigned)cull->limit;
-    uint16_t *counts = cull->counts;
-    memset(counts, 0, (size_t)w * (size_t)h * sizeof(uint16_t));
-
+    const unsigned limit = cull_limit(cull);
     int m = 0;
     for (int i = 0; i < n; i++) {
-        int px = (int)ps->x[i];
-        int py = (int)ps->y[i];
-        if (px < 0) px = 0; else if (px >= w) px = w - 1;
-        if (py < 0) py = 0; else if (py >= h) py = h - 1;
-        uint16_t *c = &counts[(size_t)py * (size_t)w + (size_t)px];
-        if (*c >= limit) continue;   /* この画素はもう飽和している */
-        (*c)++;
-        pack_vertex(ps, i, &out[m++]);
+        if (!cull_keep(cull, limit, ps->x[i], ps->y[i])) continue;
+        pos[2 * m]     = ps->x[i];
+        pos[2 * m + 1] = ps->y[i];
+        memcpy(col[m], ps->color[i], 4);
+        m++;
     }
     return m;
 }
 
+int ps_cull_indices(const ParticleSystem *ps, uint32_t *idx, const PackCull *cull)
+{
+    const int n = ps->count;
+    if (!cull_begin(cull)) return n;
+    const unsigned limit = cull_limit(cull);
+    int m = 0;
+    for (int i = 0; i < n; i++) {
+        if (!cull_keep(cull, limit, ps->x[i], ps->y[i])) continue;
+        idx[m++] = (uint32_t)i;
+    }
+    return m;
+}
