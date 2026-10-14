@@ -274,6 +274,16 @@ static int stage_stats(const BenchData *d, int sc, int stage,
     return nr > 0;
 }
 
+/* 1 回分の p50。その回に値が無ければ 0 を返す (ばらつきを見るために JSON に回ごとに出す) */
+static int stage_run_p50(const BenchData *d, int sc, int stage, int run, double *p50)
+{
+    double buf[BENCH_MAX_FRAMES];
+    int m = collect_sorted(&d->ms[ms_index(run, sc, stage, 0)], g_scenarios[sc].frames, buf);
+    if (m == 0) return 0;
+    *p50 = quantile_sorted(buf, m, 0.50);
+    return 1;
+}
+
 /* FPS = フレーム数 ÷ 実時間 (回ごとの値の中央値) */
 static double scenario_fps(const BenchData *d, int sc)
 {
@@ -397,10 +407,17 @@ char *bench_data_json(const BenchData *d, const BenchMeta *meta)
             double p50, p95;
             sb_printf(&s, "%s\n        \"%s\": ", first ? "" : ",", bench_stage_names[st]);
             first = 0;
-            if (stage_stats(d, sc, st, &p50, &p95))
-                sb_printf(&s, "{ \"p50\": %.4f, \"p95\": %.4f }", p50, p95);
-            else
+            if (stage_stats(d, sc, st, &p50, &p95)) {
+                sb_printf(&s, "{ \"p50\": %.4f, \"p95\": %.4f, \"runs_p50\": [", p50, p95);
+                for (int run = 0; run < d->runs; run++) {
+                    double r;
+                    if (stage_run_p50(d, sc, st, run, &r)) sb_printf(&s, "%s%.4f", run ? ", " : "", r);
+                    else                                   sb_printf(&s, "%snull", run ? ", " : "");
+                }
+                sb_printf(&s, "] }");
+            } else {
                 sb_printf(&s, "null");
+            }
         }
         sb_printf(&s, "\n      },\n");
 
