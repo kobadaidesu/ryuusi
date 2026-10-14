@@ -1,0 +1,81 @@
+{
+  "label": "updloop-before", "platform": "native-sim", "build": "0d82b0c", "dirty": false,
+  "particles": 300000, "size": [1280, 720], "dt": 0.016667,
+  "runs": 5, "warmup_frames": 60, "gpu_timer": false,
+  "cull_limit": 1024,
+  "note": "sim_bench: ps_update + ps_pack_gpu のみ (描画なし)。frame = update + pack、fps はその処理能力",
+  "scenarios": [
+    { "name": "idle", "frames": 300, "fps": 747.76,
+      "ms": {
+        "update": { "p50": 0.7660, "p95": 0.7922 },
+        "pack": { "p50": 0.5610, "p95": 0.5960 },
+        "frame": { "p50": 1.3310, "p95": 1.3792 }
+      },
+      "checksum_early": { "frame": 10, "count": 300000, "sum_x": 1.9217384593e+08, "sum_y": 1.0789719809e+08, "sum_vx": -5.0137237319e+02, "sum_vy": 9.5105713219e+03 },
+      "checksum": { "count": 300000, "sum_x": 1.9213753610e+08, "sum_y": 1.0789790178e+08, "sum_vx": -8.8944777043e+03, "sum_vy": -2.5501398087e+03 },
+      "checksum_stable": true },
+    { "name": "attract", "frames": 300, "fps": 630.51,
+      "ms": {
+        "update": { "p50": 1.0130, "p95": 1.0500 },
+        "pack": { "p50": 0.5625, "p95": 0.5950 },
+        "frame": { "p50": 1.5780, "p95": 1.6312 }
+      },
+      "checksum_early": { "frame": 10, "count": 300000, "sum_x": 1.9212824680e+08, "sum_y": 1.0790102983e+08, "sum_vx": -1.5157229647e+03, "sum_vy": 2.3116425432e+04 },
+      "checksum": { "count": 300000, "sum_x": 1.9216591809e+08, "sum_y": 1.0805566437e+08, "sum_vx": -2.9717388153e+04, "sum_vy": 9.7643260471e+04 },
+      "checksum_stable": true },
+    { "name": "gather_hold", "frames": 180, "fps": 645.57,
+      "ms": {
+        "update": { "p50": 1.3215, "p95": 1.3610 },
+        "pack": { "p50": 0.1860, "p95": 0.5581 },
+        "frame": { "p50": 1.5155, "p95": 1.8802 }
+      },
+      "checksum_early": { "frame": 10, "count": 300000, "sum_x": 1.9200111437e+08, "sum_y": 1.0800037324e+08, "sum_vx": -1.0002903319e+02, "sum_vy": -3.8068086798e+01 },
+      "checksum": { "count": 300000, "sum_x": 1.9200000000e+08, "sum_y": 1.0800000000e+08, "sum_vx": -9.5358138242e-04, "sum_vy": -2.2831862475e-04 },
+      "checksum_stable": true },
+    { "name": "gather_release", "frames": 60, "fps": 1037.81,
+      "ms": {
+        "update": { "p50": 0.7585, "p95": 0.7821 },
+        "pack": { "p50": 0.2050, "p95": 0.2200 },
+        "frame": { "p50": 0.9650, "p95": 0.9941 }
+      },
+      "checksum_early": { "frame": 10, "count": 300000, "sum_x": 1.9200000000e+08, "sum_y": 1.0800000000e+08, "sum_vx": -1.8132087294e-01, "sum_vy": -4.3414147280e-02 },
+      "checksum": { "count": 300000, "sum_x": 1.9200000003e+08, "sum_y": 1.0800000000e+08, "sum_vx": 2.9859937405e-01, "sum_vy": 1.3553929507e-01 },
+      "checksum_stable": true },
+    { "name": "gather_release_spread", "frames": 120, "fps": 1026.85,
+      "ms": {
+        "update": { "p50": 0.7620, "p95": 0.7840 },
+        "pack": { "p50": 0.2000, "p95": 0.2531 },
+        "frame": { "p50": 0.9635, "p95": 1.0280 }
+      },
+      "checksum_early": { "frame": 10, "count": 300000, "sum_x": 1.9200499138e+08, "sum_y": 1.0800000002e+08, "sum_vx": 5.4318176163e+04, "sum_vy": 1.3418058252e-01 },
+      "checksum": { "count": 300000, "sum_x": 1.9263748003e+08, "sum_y": 1.0800000002e+08, "sum_vx": 6.2134557716e+05, "sum_vy": 1.1999569546e-01 },
+      "checksum_stable": true },
+    { "name": "vortex", "frames": 300, "fps": 544.00,
+      "ms": {
+        "update": { "p50": 1.1495, "p95": 1.3160 },
+        "pack": { "p50": 0.5910, "p95": 1.0501 },
+        "frame": { "p50": 1.7575, "p95": 2.2640 }
+      },
+      "checksum_early": { "frame": 10, "count": 300000, "sum_x": 1.9656939788e+08, "sum_y": 8.5936999461e+07, "sum_vx": 9.9696396013e+06, "sum_vy": -1.8349857001e+08 },
+      "checksum": { "count": 300000, "sum_x": 1.4532717196e+08, "sum_y": 1.0152245688e+08, "sum_vx": -1.9922300363e+07, "sum_vy": -3.7661020218e+07 },
+      "checksum_stable": true },
+    { "name": "explode", "frames": 60, "fps": 723.00,
+      "ms": {
+        "update": { "p50": 0.8115, "p95": 0.8860 },
+        "pack": { "p50": 0.5575, "p95": 0.5943 },
+        "frame": { "p50": 1.3685, "p95": 1.4551 }
+      },
+      "checksum_early": { "frame": 10, "count": 300000, "sum_x": 1.4211182176e+08, "sum_y": 9.5470668235e+07, "sum_vx": -1.8591991789e+07, "sum_vy": -3.4928053268e+07 },
+      "checksum": { "count": 300000, "sum_x": 1.3564898467e+08, "sum_y": 7.0596267964e+07, "sum_vx": 7.7757751517e+06, "sum_vy": -2.5526214725e+07 },
+      "checksum_stable": true },
+    { "name": "ripple", "frames": 300, "fps": 298.68,
+      "ms": {
+        "update": { "p50": 2.7370, "p95": 4.1281 },
+        "pack": { "p50": 0.6120, "p95": 0.7712 },
+        "frame": { "p50": 3.3530, "p95": 4.7768 }
+      },
+      "checksum_early": { "frame": 10, "count": 300000, "sum_x": 1.3706476863e+08, "sum_y": 6.6201049739e+07, "sum_vx": 9.0033814554e+06, "sum_vy": -2.6938361626e+07 },
+      "checksum": { "count": 300000, "sum_x": 1.5005473963e+08, "sum_y": 2.9485999416e+07, "sum_vx": 7.9207964789e+06, "sum_vy": -2.4750388793e+06 },
+      "checksum_stable": true }
+  ]
+}

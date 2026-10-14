@@ -1,4 +1,5 @@
 #include "particle.h"
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,7 +72,7 @@ void ps_init(ParticleSystem *ps, int win_w, int win_h, const SimParams *params)
         ps->vy[i]   = frand_range(-50.0f, 50.0f);
         ps->life[i] = 1.0f;
         ps->hue[i]  = frand_range(params->hue_min, params->hue_max);
-        ps->mass[i] = frand_range(0.5f, 2.0f);
+        ps->inv_mass[i] = 1.0f / frand_range(0.5f, 2.0f);
         ps->count++;
     }
 }
@@ -99,7 +100,7 @@ void ps_spawn(ParticleSystem *ps, float cx, float cy, int count,
         ps->vy[i]   = sinf(angle) * speed * frand() - 30.0f;
         ps->life[i] = 1.0f;
         ps->hue[i]  = frand_range(params->hue_min, params->hue_max);
-        ps->mass[i] = frand_range(0.5f, 2.0f);
+        ps->inv_mass[i] = 1.0f / frand_range(0.5f, 2.0f);
 
         ps->count++;
         added++;
@@ -109,6 +110,45 @@ void ps_spawn(ParticleSystem *ps, float cx, float cy, int count,
 /* ------------------------------------------------------------------ */
 /*  ps_update  –  メインループから毎フレーム呼ぶ                        */
 /* ------------------------------------------------------------------ */
+/* 寿命の減り方 (1 秒あたり)。0 なので粒子は寿命では消えない。
+ * 0 より大きくすると ps_update が ps_remove_dead で消えた粒子を詰める */
+#define LIFE_DECAY 0.0f
+
+/* 寿命が尽きた粒子を末尾と入れ替えて削除する O(1)。
+ * 主ループから外してあるのは、ループの途中で要素数が変わると
+ * 自動ベクトル化ができなくなるため */
+static void ps_remove_dead(ParticleSystem *ps)
+{
+    int i = 0;
+    while (i < ps->count) {
+        if (ps->life[i] > 0.0f) { i++; continue; }
+        int last = ps->count - 1;
+        ps->x[i]        = ps->x[last];
+        ps->y[i]        = ps->y[last];
+        ps->vx[i]       = ps->vx[last];
+        ps->vy[i]       = ps->vy[last];
+        ps->life[i]     = ps->life[last];
+        ps->hue[i]      = ps->hue[last];
+        ps->inv_mass[i] = ps->inv_mass[last];
+        ps->count--;
+    }
+}
+
+/* f と上限 cap の小さい方。fminf と違って NaN を考えないので比較 1 回 (SIMD の min) になる */
+static inline float min_cap(float f, float cap)
+{
+    return f < cap ? f : cap;
+}
+
+/*
+ * 主ループは自動ベクトル化 (SIMD) できる形にしてある:
+ *  - フレーム内で一定の条件 (モード、タイムストップ、G) と係数はループの外で決め、
+ *    ループの中では係数を掛けるだけにする (使わない力は係数 0 で足しても値は変わらない)
+ *  - 粒子ごとの条件 (力の上限、範囲、速度制限、壁) は分岐ではなく選択 (a ? b : c) で書く
+ *  - 配列は restrict のローカルポインタで触り、1 粒子の値はローカル変数に読んでから最後に書く
+ *  - 波紋は「波紋ごとに全粒子を回す」別のループにする (内側の可変長ループがあると
+ *    外側のループをベクトル化できないため)
+ */
 void ps_update(ParticleSystem *ps,
                float dt,
                float mx, float my,
@@ -120,14 +160,7 @@ void ps_update(ParticleSystem *ps,
                int   ripple_count,
                const SimParams *params)
 {
-    const float GRAVITY      = params->gravity;
-    const float DAMPING      = params->damping;
-    const float ATTRACT_STR  = params->attract_str;
-    const float TIMESTOP_STR = params->timestop_str;
-    const float REPEL_STR    = params->repel_str;
-    const float VORTEX_STR   = params->vortex_str;
-    const float EXPLODE_STR  = params->explode_str;
-    const float LIFE_DECAY   = 0.0f;
+    const float DAMPING = params->damping;
     const float WIN_W = (float)ps->win_w;
     const float WIN_H = (float)ps->win_h;
 
@@ -137,159 +170,179 @@ void ps_update(ParticleSystem *ps,
     const float BX = (WIN_W - BW) * 0.5f;
     const float BY = (WIN_H - BH) * 0.5f;
 
-    int i = 0;
-    while (i < ps->count) {
-        /* ---- 寿命 ---- */
-        ps->life[i] -= LIFE_DECAY * dt;
-        if (ps->life[i] <= 0.0f) {
-            /* 末尾と入れ替えて即削除 O(1) */
-            int last = ps->count - 1;
-            ps->x[i]    = ps->x[last];
-            ps->y[i]    = ps->y[last];
-            ps->vx[i]   = ps->vx[last];
-            ps->vy[i]   = ps->vy[last];
-            ps->life[i] = ps->life[last];
-            ps->hue[i]  = ps->hue[last];
-            ps->mass[i] = ps->mass[last];
-            ps->count--;
-            continue; /* 同インデックスを再処理 */
-        }
+    /* ---- 寿命 (LIFE_DECAY = 0 なので今は何もしない) ---- */
+    if (LIFE_DECAY > 0.0f) {
+        for (int i = 0; i < ps->count; i++)
+            ps->life[i] -= LIFE_DECAY * dt;
+        ps_remove_dead(ps);
+    }
 
-        /* ---- 重力 ---- */
-        ps->vy[i] += GRAVITY * dt;
+    const int n = ps->count;
+    float       *restrict X    = ps->x;
+    float       *restrict Y    = ps->y;
+    float       *restrict VX   = ps->vx;
+    float       *restrict VY   = ps->vy;
+    const float *restrict IM   = ps->inv_mass;
 
-        /* ---- 風 (定常加速度) ---- */
-        ps->vx[i] += params->wind_x * dt;
-        ps->vy[i] += params->wind_y * dt;
-
-        /* ---- 波紋 (リング状の衝撃波) ---- */
+    /* ---- 波紋 (リング状の衝撃波): 波紋ごとに全粒子へ ----
+     *  輪の幅 80px の中だけ、輪からの近さ frac の 2 乗に比例して外向きに押す。
+     *  輪の外は frac = 0 になるので分岐はいらない */
+    {
+        const float RING_W     = 80.0f;
+        const float INV_RING_W = 1.0f / RING_W;
+        const float k          = params->ripple_str * dt;
         for (int r = 0; r < ripple_count; r++) {
-            float rdx   = ps->x[i] - ripples[r].cx;
-            float rdy   = ps->y[i] - ripples[r].cy;
-            float rdist = sqrtf(rdx * rdx + rdy * rdy) + 0.1f;
-            float ring_w = 80.0f;
-            float diff  = fabsf(rdist - ripples[r].radius);
-            if (diff < ring_w) {
-                float frac = 1.0f - diff / ring_w;
-                float rf   = params->ripple_str * frac * frac / (rdist * ps->mass[i]);
-                ps->vx[i] += (rdx / rdist) * rf * dt;
-                ps->vy[i] += (rdy / rdist) * rf * dt;
+            const float cx  = ripples[r].cx;
+            const float cy  = ripples[r].cy;
+            const float rad = ripples[r].radius;
+            for (int i = 0; i < n; i++) {
+                float rdx   = X[i] - cx;
+                float rdy   = Y[i] - cy;
+                float rdist = sqrtf(rdx * rdx + rdy * rdy) + 0.1f;
+                float inv_r = 1.0f / rdist;
+                float frac  = 1.0f - fabsf(rdist - rad) * INV_RING_W;
+                frac = frac > 0.0f ? frac : 0.0f;
+                /* 方向 (rdx / rdist) × 強さ (str × frac² / rdist / mass) × dt */
+                float rf = k * frac * frac * inv_r * inv_r * IM[i];
+                VX[i] += rdx * rf;
+                VY[i] += rdy * rf;
             }
         }
+    }
 
-        /* ---- 常時カーソル引力 (クリック不要) ---- */
+    /* ---- フレーム内で一定の係数 ---- */
+    /* 重力と風 (定常加速度) */
+    const float acc_x = params->wind_x * dt;
+    const float acc_y = params->gravity * dt + params->wind_y * dt;
+    /* 常時カーソル引力 (クリック不要) */
+    const float passive_k = params->passive_attract * dt;
+    /* G キー: 位置を直接カーソルへ補間。lerp = 1 - exp(-speed * dt) はフレームで一定 */
+    const float gather_lerp = gather_on ? 1.0f - expf(-params->gather_str * dt) : 0.0f;
+    /* タイムストップ: 速度を減衰。左クリック中は専用の強い引力 */
+    const float ts_damp = timestop_on ? params->timestop_damping : 1.0f;
+    const float ts_k    = (timestop_on && mode_active && mode == MODE_ATTRACT)
+                        ? params->timestop_str * dt : 0.0f;
+
+    /* マウスのモード: 中心へ向かう成分 (rad、引力 +1 / 斥力 -1) と接線成分 (tan、渦) の向き、
+     * 強さ k、力の上限 cap、効く範囲 (距離の 2 乗) range2 */
+    float m_k = 0.0f, m_cap = FLT_MAX, m_rad = 0.0f, m_tan = 0.0f, m_range2 = FLT_MAX;
+    int   m_explode = 0;
+    if (mode_active) {
+        switch (mode) {
+            case MODE_ATTRACT:
+                m_k = params->attract_str;  m_rad = 1.0f;
+                if (params->attract_range > 0.0f)
+                    m_range2 = params->attract_range * params->attract_range;
+                break;
+            case MODE_REPEL:
+                m_k = params->repel_str;    m_rad = -1.0f;
+                break;
+            case MODE_EXPLODE:
+                /* 近い粒子ほど強く吹き飛ばす */
+                m_k = params->explode_str;  m_rad = -1.0f; m_cap = params->explode_cap;
+                m_explode = 1;
+                break;
+            case MODE_VORTEX:
+                /* 接線方向に回し、同じ強さで外向きにも押す (渦の目: 粒子が入れないゾーン) */
+                m_k = params->vortex_str;   m_rad = -1.0f; m_tan = 1.0f;
+                m_cap = params->vortex_cap;
+                break;
+            default:
+                break;
+        }
+    }
+
+    const float spd_lim  = params->speed_limit;
+    const float spd_lim2 = spd_lim * spd_lim;
+    const float bounce   = params->bounce;
+    const float BX1 = BX + BW;
+    const float BY1 = BY + BH;
+
+    for (int i = 0; i < n; i++) {
+        float x  = X[i],  y  = Y[i];
+        float vx = VX[i], vy = VY[i];
+        const float im = IM[i];
+
+        /* ---- 重力・風 ---- */
+        vx += acc_x;
+        vy += acc_y;
+
+        /* ---- カーソルへの距離 (以下の力で共有する) ---- */
+        float dx  = mx - x;
+        float dy  = my - y;
+        float d2  = dx * dx + dy * dy + 100.0f;   /* 0 除算防止 */
+        float id  = 1.0f / sqrtf(d2);             /* 1 / 距離   */
+        float id2 = id * id;
+
+        /* ---- 常時カーソル引力 ---- */
         {
-            float dx = mx - ps->x[i];
-            float dy = my - ps->y[i];
-            float dist2 = dx * dx + dy * dy + 100.0f;
-            float inv_dist = 1.0f / sqrtf(dist2);
-            float f = params->passive_attract * inv_dist * inv_dist / ps->mass[i];
-            ps->vx[i] += dx * inv_dist * f * dt;
-            ps->vy[i] += dy * inv_dist * f * dt;
+            float f = passive_k * id2 * im;
+            vx += dx * id * f;
+            vy += dy * id * f;
         }
 
-        /* ---- G キー: 位置を直接カーソルへ補間 (一瞬で集まる) ---- */
+        /* ---- G キー: 位置をカーソルへ寄せ、速度も殺してオーバーシュートを防ぐ ---- */
         if (gather_on) {
-            /* lerp = 1 - exp(-speed * dt)  →  speed が大きいほど即座に到着 */
-            float lerp = 1.0f - expf(-params->gather_str * dt);
-            ps->x[i]  += (mx - ps->x[i]) * lerp;
-            ps->y[i]  += (my - ps->y[i]) * lerp;
-            /* 速度も殺してオーバーシュートを防ぐ */
-            ps->vx[i] *= 0.05f;
-            ps->vy[i] *= 0.05f;
+            x  += (mx - x) * gather_lerp;
+            y  += (my - y) * gather_lerp;
+            vx *= 0.05f;
+            vy *= 0.05f;
+            /* 位置が動いたので、以下の力のために距離を測り直す */
+            dx  = mx - x;
+            dy  = my - y;
+            d2  = dx * dx + dy * dy + 100.0f;
+            id  = 1.0f / sqrtf(d2);
+            id2 = id * id;
         }
 
         /* ---- タイムストップ (トグル、他モードと重複可) ---- */
-        if (timestop_on) {
-            ps->vx[i] *= params->timestop_damping;
-            ps->vy[i] *= params->timestop_damping;
-            if (mode_active && mode == MODE_ATTRACT) {
-                float dx = mx - ps->x[i];
-                float dy = my - ps->y[i];
-                float dist2 = dx * dx + dy * dy + 100.0f;
-                float inv_dist = 1.0f / sqrtf(dist2);
-                float f = TIMESTOP_STR * inv_dist * inv_dist / ps->mass[i];
-                ps->vx[i] += dx * inv_dist * f * dt;
-                ps->vy[i] += dy * inv_dist * f * dt;
-            }
+        vx *= ts_damp;
+        vy *= ts_damp;
+        {
+            float f = ts_k * id2 * im;
+            vx += dx * id * f;
+            vy += dy * id * f;
         }
 
         /* ---- マウスインタラクション ---- */
-        if (mode_active && mode != MODE_NONE && mode != MODE_SPAWN) {
-            float dx = mx - ps->x[i];
-            float dy = my - ps->y[i];
-            float dist2 = dx * dx + dy * dy + 100.0f; /* 0 除算防止 */
-            float inv_dist = 1.0f / sqrtf(dist2);
-            float inv_dist2 = inv_dist * inv_dist;
-
-            switch (mode) {
-                case MODE_ATTRACT: {
-                    float range = params->attract_range;
-                    if (range <= 0.0f || dist2 <= range * range) {
-                        float f = ATTRACT_STR * inv_dist2 / ps->mass[i];
-                        ps->vx[i] += dx * inv_dist * f * dt;
-                        ps->vy[i] += dy * inv_dist * f * dt;
-                    }
-                    break;
-                }
-                case MODE_REPEL: {
-                    float f = REPEL_STR * inv_dist2 / ps->mass[i];
-                    ps->vx[i] -= dx * inv_dist * f * dt;
-                    ps->vy[i] -= dy * inv_dist * f * dt;
-                    break;
-                }
-                case MODE_EXPLODE: {
-                    /* 近い粒子ほど強く吹き飛ばす (一度だけ) */
-                    float f = EXPLODE_STR * inv_dist2 / ps->mass[i];
-                    f = fminf(f, params->explode_cap);
-                    ps->vx[i] -= dx * inv_dist * f * dt;
-                    ps->vy[i] -= dy * inv_dist * f * dt;
-                    ps->life[i] = fminf(ps->life[i] + 0.1f, 1.0f);
-                    break;
-                }
-                case MODE_VORTEX: {
-                    /* 接線方向に力を加えて渦を作る */
-                    float tx = -dy * inv_dist;
-                    float ty =  dx * inv_dist;
-                    float f  = VORTEX_STR * inv_dist2 / ps->mass[i];
-                    f = fminf(f, params->vortex_cap);
-                    ps->vx[i] += tx * f * dt;
-                    ps->vy[i] += ty * f * dt;
-                    /* 渦の目: 中心から外向きに反発 (粒子が入れないゾーン) */
-                    float fr = VORTEX_STR * inv_dist2 / ps->mass[i];
-                    fr = fminf(fr, params->vortex_cap);
-                    ps->vx[i] -= dx * inv_dist * fr * dt;
-                    ps->vy[i] -= dy * inv_dist * fr * dt;
-                    break;
-                }
-                default: break;
-            }
+        {
+            float f = min_cap(m_k * id2 * im, m_cap);
+            f = d2 <= m_range2 ? f : 0.0f;         /* 引力の範囲外 */
+            f *= dt;
+            vx += (m_rad * dx - m_tan * dy) * id * f;
+            vy += (m_rad * dy + m_tan * dx) * id * f;
         }
 
         /* ---- 速度制限 ---- */
-        float spd2 = ps->vx[i] * ps->vx[i] + ps->vy[i] * ps->vy[i];
-        float spd_lim = params->speed_limit;
-        if (spd2 > spd_lim * spd_lim) {
-            float inv_spd = spd_lim / sqrtf(spd2);
-            ps->vx[i] *= inv_spd;
-            ps->vy[i] *= inv_spd;
-        }
+        float spd2  = vx * vx + vy * vy;
+        float scale = spd2 > spd_lim2 ? spd_lim / sqrtf(spd2) : 1.0f;
+        vx *= scale;
+        vy *= scale;
 
         /* ---- 位置更新 ---- */
-        ps->x[i] += ps->vx[i] * dt;
-        ps->y[i] += ps->vy[i] * dt;
+        x += vx * dt;
+        y += vy * dt;
 
         /* ---- 減衰 ---- */
-        ps->vx[i] *= DAMPING;
-        ps->vy[i] *= DAMPING;
+        vx *= DAMPING;
+        vy *= DAMPING;
 
         /* ---- 境界処理: 壁で反射 ---- */
-        if (ps->x[i] < BX)      { ps->x[i] = BX;      ps->vx[i] =  fabsf(ps->vx[i]) * params->bounce; }
-        if (ps->x[i] > BX + BW) { ps->x[i] = BX + BW; ps->vx[i] = -fabsf(ps->vx[i]) * params->bounce; }
-        if (ps->y[i] < BY)      { ps->y[i] = BY;       ps->vy[i] =  fabsf(ps->vy[i]) * params->bounce; }
-        if (ps->y[i] > BY + BH) { ps->y[i] = BY + BH;  ps->vy[i] = -fabsf(ps->vy[i]) * params->bounce; }
+        int hit;
+        hit = x < BX;  x = hit ? BX  : x; vx = hit ?  fabsf(vx) * bounce : vx;
+        hit = x > BX1; x = hit ? BX1 : x; vx = hit ? -fabsf(vx) * bounce : vx;
+        hit = y < BY;  y = hit ? BY  : y; vy = hit ?  fabsf(vy) * bounce : vy;
+        hit = y > BY1; y = hit ? BY1 : y; vy = hit ? -fabsf(vy) * bounce : vy;
 
-        i++;
+        X[i]  = x;  Y[i]  = y;
+        VX[i] = vx; VY[i] = vy;
+    }
+
+    /* ---- 爆発は寿命も少し回復させる (今は寿命が減らないので見た目は変わらない) ---- */
+    if (m_explode) {
+        float *restrict L = ps->life;
+        for (int i = 0; i < n; i++)
+            L[i] = min_cap(L[i] + 0.1f, 1.0f);
     }
 
     /* ---- マウス位置でスポーン (MODE_SPAWN) ---- */
@@ -334,7 +387,7 @@ void ps_reset(ParticleSystem *ps, const SimParams *params)
         ps->vy[i]   = frand_range(-50.0f, 50.0f);
         ps->life[i] = 1.0f;
         ps->hue[i]  = frand_range(params->hue_min, params->hue_max);
-        ps->mass[i] = frand_range(0.5f, 2.0f);
+        ps->inv_mass[i] = 1.0f / frand_range(0.5f, 2.0f);
         ps->count++;
     }
 }
