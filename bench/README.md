@@ -57,8 +57,11 @@ make bench LABEL=try BENCH_RUNS=1  # 1 回だけ (約 20 秒)
 直接動かすなら:
 
 ```sh
-./bin/particle_flow --bench [--bench-out=path.json] [--bench-runs=N] [--bench-label=name]
+./bin/particle_flow --bench [--bench-out=path.json] [--bench-runs=N] [--bench-label=name] [--bench-cull=N]
 ```
+
+`--bench-cull=N` は飽和カリング (同じ画素に中心がある粒子を N 個までしか描かない) の上限。0 で無効、省略時は既定値 (`PS_CULL_LIMIT_DEFAULT`)。
+結果の JSON には `cull_limit` と、GPU の名前 `gpu_renderer` が入る。
 
 ウィンドウが開いて計測が進み、終わると標準出力に Markdown の表を出して終了する。
 **ウィンドウを隠さないこと** (macOS は隠れたウィンドウの描画を間引くので数字が変わる)。
@@ -81,9 +84,21 @@ http://127.0.0.1:8126/?bench=1&label=baseline&report=/report
 | `bench=1` | 計測モードで起動 (キャンバスを 1280×720 に固定) |
 | `label=name` | 結果のラベル (既定 `bench`) |
 | `runs=N` | 繰り返す回数 (既定 1) |
+| `cull=N` | 飽和カリングの上限 (`--bench-cull` と同じ。0 で無効) |
 | `report=URL` | 結果の JSON を POST する先。`serve.py` なら `/report` で `bench/results/<label>-wasm.json` に保存される |
 
 終わるとページのキャンバスの下に表と JSON が出る (`window.benchResult` にも入る)。タブのタイトルが `BENCH DONE` になる。
+
+タブを前面に出しておけないときは headless Chrome で走らせられる (headless では rAF が止まらない):
+
+```sh
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+  --user-data-dir=/tmp/pf-chrome --window-size=1400,900 \
+  "http://127.0.0.1:8126/?bench=1&label=try&report=/report"
+# bench/results/try-wasm.json ができたら Chrome を止める
+```
+
+`gpu_renderer` で実 GPU か確かめること。`ANGLE (Apple, ANGLE Metal Renderer: ...)` なら実 GPU、`SwiftShader` ならソフトウェア描画なので gpu の数字は参考にならない (CPU 側の update / pack / upload を比べる)。
 `serve.py` は COOP / COEP ヘッダーを付けて cross-origin isolated にしている (`performance.now()` の分解能が 5 µs になる)。
 
 ## 比較
