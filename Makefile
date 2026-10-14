@@ -257,6 +257,10 @@ $(WASMDIR)/im_opengl3.o: $(IMGDIR)/imgui_impl_opengl3.cpp | $(WASMDIR)
 
 $(WASMDIR)/bench.o: $(BUILD_INFO)
 
+# フラグ (WASM_OPT など) を変えたら作り直す。make はフラグの変化を見ないので、
+# これが無いと古いフラグのオブジェクトがそのまま LTO でリンクされる
+$(WASM_ALL_OBJS): Makefile
+
 $(WASMDIR):
 	mkdir -p $(WASMDIR)
 
