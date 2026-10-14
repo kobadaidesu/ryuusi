@@ -32,6 +32,10 @@ int gui_process_event(void *sdl_event);
 int gui_render(SimParams *params, int hud_visible, int params_visible,
                float fps, int count, int mode, int timestop_on);
 
+/* ベンチマークの進捗・結果を表示する (NULL で非表示)。
+ * 文字列は呼び出し側が保持し、次の gui_render で描かれる */
+void gui_set_bench_text(const char *text);
+
 /* ImGui 後始末 */
 void gui_shutdown(void);
 

@@ -63,7 +63,15 @@ static void preset_save(int i, const SimParams *p)
     if (f) { fwrite(p, sizeof(SimParams), 1, f); fclose(f); }
 }
 
+/* ベンチマークの表示文字列 (gui_set_bench_text) */
+static const char *g_bench_text = nullptr;
+
 extern "C" {
+
+void gui_set_bench_text(const char *text)
+{
+    g_bench_text = text;
+}
 
 void gui_init(SDL_Window *window, void *gl_ctx)
 {
@@ -426,6 +434,19 @@ int gui_render(SimParams *p, int hud_visible, int params_visible,
             result |= 1;
         }
 
+        ImGui::End();
+    }
+
+    /* ---- ベンチマークの進捗 / 結果 ---- */
+    if (g_bench_text) {
+        ImGuiIO &bio = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(bio.DisplaySize.x - 10.0f, bio.DisplaySize.y - 10.0f),
+                                ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+        ImGui::SetNextWindowBgAlpha(0.85f);
+        ImGui::Begin("Benchmark", nullptr,
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing);
+        ImGui::TextUnformatted(g_bench_text);
         ImGui::End();
     }
 

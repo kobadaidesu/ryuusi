@@ -6,6 +6,8 @@
 #    make DEBUG=1   → Debug ビルド
 #    make clean     → ビルド成果物を削除
 #    make run       → ビルド後に実行
+#    make bench     → 計測モードを実行して bench/results/<LABEL>-native.json に保存
+#                     (使い方は bench/README.md)
 #
 #  依存:
 #    Linux:   sudo apt install libsdl2-dev libglew-dev
@@ -41,7 +43,7 @@ ifeq ($(PKG_LIBS),)
     PKG_LIBS   := -lSDL2 -lSDL2main -lGLEW -lGL -lm
 endif
 
-CFLAGS   := $(COMMON_FLAGS) -std=c99   $(PKG_CFLAGS) -MMD -MP
+CFLAGS   := $(COMMON_FLAGS) -std=c99   $(PKG_CFLAGS) -I$(OBJDIR) -MMD -MP
 CXXFLAGS := $(COMMON_FLAGS) -std=c++17 $(PKG_CFLAGS) -I$(SRCDIR) -I$(THIRDDIR) -I$(IMGDIR) -MMD -MP
 LIBS     := $(PKG_LIBS) -lm
 
@@ -79,9 +81,20 @@ DEPS := $(ALL_OBJS:.o=.d)
 -include $(DEPS)
 
 # ---- ルール ----
-.PHONY: all clean run
+.PHONY: all clean run FORCE
 
 all: $(TARGET)
+
+# ---- ビルド情報 (bench の結果に git の short sha と未コミットの変更の有無を入れる) ----
+# 中身が変わったときだけ書き換えるので、毎回 bench.o が作り直されることはない
+BUILD_INFO := $(OBJDIR)/build_info.h
+$(BUILD_INFO): FORCE | $(OBJDIR)
+	@sha=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown); \
+	if git diff --quiet HEAD -- src web Makefile 2>/dev/null; then dirty=0; else dirty=1; fi; \
+	printf '#define BUILD_SHA "%s"\n#define BUILD_DIRTY %s\n' "$$sha" "$$dirty" > $@.tmp; \
+	if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+
+$(OBJDIR)/bench.o: $(BUILD_INFO)
 
 # リンクは g++ で行う (C++ ランタイムのため)
 $(TARGET): $(ALL_OBJS) | bin
@@ -127,6 +140,32 @@ run: all
 	$(TARGET)
 
 # ============================================================
+#  ベンチマーク (bench/README.md)
+#
+#    make bench LABEL=baseline        → bench/results/baseline-native.json
+#    make sim-bench                   → SDL なしの物理だけのマイクロベンチ (ネイティブ)
+#    make sim-bench-wasm              → 同じものを wasm にして Node で実行
+# ============================================================
+LABEL      ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo bench)
+BENCH_RUNS ?= 5
+BENCH_OUT  := bench/results/$(LABEL)-native.json
+
+.PHONY: bench sim-bench sim-bench-wasm
+
+bench: $(TARGET)
+	mkdir -p bench/results
+	$(TARGET) --bench --bench-runs=$(BENCH_RUNS) --bench-label=$(LABEL) --bench-out=$(BENCH_OUT)
+
+SIM_BENCH_SRCS := bench/sim_bench.c $(SRCDIR)/particle.c $(SRCDIR)/bench_core.c
+
+bin/sim_bench: $(SIM_BENCH_SRCS) $(SRCDIR)/particle.h $(SRCDIR)/bench_core.h $(BUILD_INFO) | bin
+	$(CC) $(COMMON_FLAGS) -std=c99 -I$(SRCDIR) -I$(OBJDIR) -o $@ $(SIM_BENCH_SRCS) -lm
+
+sim-bench: bin/sim_bench
+	mkdir -p bench/results
+	./bin/sim_bench --label=$(LABEL) --runs=$(BENCH_RUNS) --out=bench/results/$(LABEL)-native-sim.json
+
+# ============================================================
 #  WebAssembly ターゲット (Emscripten)
 #
 #  使い方:
@@ -145,7 +184,7 @@ WASM_COMMON := \
     -sUSE_SDL=2 \
     -I$(SRCDIR) -I$(THIRDDIR) -I$(IMGDIR)
 
-WASM_CFLAGS   := $(WASM_COMMON) -std=c99
+WASM_CFLAGS   := $(WASM_COMMON) -std=c99 -I$(OBJDIR)
 WASM_CXXFLAGS := $(WASM_COMMON) -std=c++17
 
 # web/shell.html を元に bin/index.html を作る(キャンバスを画面いっぱいにするページ)
@@ -161,6 +200,9 @@ WASM_LDFLAGS := \
     -sALLOW_MEMORY_GROWTH=1 \
     -sINITIAL_MEMORY=67108864 \
     --shell-file $(WASM_SHELL)
+
+# 計測モードの結果をページに出すのに使う (bench.c の EM_JS)
+WASM_LDFLAGS += '-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$$UTF8ToString,$$stringToNewUTF8'
 
 WASM_C_SRCS  := $(wildcard $(SRCDIR)/*.c)
 WASM_C_OBJS  := $(patsubst $(SRCDIR)/%.c, $(WASMDIR)/%.o, $(WASM_C_SRCS))
@@ -206,8 +248,20 @@ $(WASMDIR)/im_sdl2.o: $(IMGDIR)/imgui_impl_sdl2.cpp | $(WASMDIR)
 $(WASMDIR)/im_opengl3.o: $(IMGDIR)/imgui_impl_opengl3.cpp | $(WASMDIR)
 	$(EMCXX) $(WASM_CXXFLAGS) -c -o $@ $<
 
+$(WASMDIR)/bench.o: $(BUILD_INFO)
+
 $(WASMDIR):
 	mkdir -p $(WASMDIR)
+
+# sim_bench の wasm 版 (Node で実行する)。フラグはアプリの wasm と同じ WASM_COMMON
+bin/sim_bench.js: $(SIM_BENCH_SRCS) $(SRCDIR)/particle.h $(SRCDIR)/bench_core.h $(BUILD_INFO) | bin
+	$(EMCC) $(WASM_CFLAGS) -o $@ $(SIM_BENCH_SRCS) \
+	    $(filter-out -sUSE_SDL=2 -sUSE_WEBGL2=1 -sFULL_ES3=1 --shell-file $(WASM_SHELL),$(WASM_LDFLAGS)) \
+	    -sENVIRONMENT=node -sNODERAWFS=1
+
+sim-bench-wasm: bin/sim_bench.js
+	mkdir -p bench/results
+	node bin/sim_bench.js --label=$(LABEL) --runs=$(BENCH_RUNS) --out=bench/results/$(LABEL)-wasm-sim.json
 
 wasm-clean:
 	rm -rf $(WASMDIR) $(WASM_TARGET) bin/index.js bin/index.wasm

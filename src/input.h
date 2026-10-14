@@ -2,6 +2,7 @@
 #define INPUT_H
 
 #include "particle.h"   /* InteractMode */
+#include "bench_core.h" /* BenchInput */
 #include <SDL2/SDL.h>
 
 /* ------------------------------------------------------------------ *
@@ -45,5 +46,10 @@ void input_init(InputState *in);
  *   block_keyboard : ImGui がキーボードを使用中のとき 1 → キー入力を無効化
  * ※ 各 SDL イベントは ImGui にも転送する。 */
 void input_process_ex(InputState *in, int block_mouse, int block_keyboard);
+
+/* ベンチマーク用: SDL イベントは終了 (閉じる / Esc / Q) だけを見て捨て、
+ * 入力はシナリオが与えた値 bi で上書きする。ImGui にはイベントを渡さない
+ * (計測中にクリックで設定が変わらないように) */
+void input_process_bench(InputState *in, const BenchInput *bi);
 
 #endif /* INPUT_H */
