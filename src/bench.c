@@ -64,6 +64,8 @@ static struct {
     char      *result_md;      /* 結果の Markdown (GUI に表示)      */
 } g_b;
 
+static const char *gpu_renderer_name(void);
+
 int bench_configure(int argc, char **argv)
 {
     for (int i = 1; i < argc; i++) {
@@ -125,8 +127,8 @@ void bench_start(Renderer *r, int win_w, int win_h)
     if (win_w != BENCH_W || win_h != BENCH_H)
         fprintf(stderr, "[bench] warning: window is %dx%d (expected %dx%d)\n",
                 win_w, win_h, BENCH_W, BENCH_H);
-    printf("[bench] runs=%d gpu_timer=%s cull=%d\n", g_cfg.runs, g_b.gpu_timer ? "yes" : "no",
-           g_cfg.cull_limit);
+    printf("[bench] runs=%d gpu_timer=%s cull=%d gpu=%s\n", g_cfg.runs,
+           g_b.gpu_timer ? "yes" : "no", g_cfg.cull_limit, gpu_renderer_name());
 }
 
 /* ------------------------------------------------------------------ */
@@ -159,6 +161,39 @@ static void poll_gpu(int wait)
 /* ------------------------------------------------------------------ */
 /*  結果の出力                                                          */
 /* ------------------------------------------------------------------ */
+/* GPU の名前。ブラウザの GL_RENDERER は "WebKit WebGL" に伏せられているので、
+ * WEBGL_debug_renderer_info で実際の名前 (ANGLE (Apple, ANGLE Metal Renderer: ...) や
+ * SwiftShader) を取る。取れなければ伏せられた名前のまま */
+#ifdef __EMSCRIPTEN__
+EM_JS(char *, bench_js_gpu_renderer, (void), {
+    var name = "";
+    try {
+        var ext = GLctx.getExtension("WEBGL_debug_renderer_info");
+        name = ext ? GLctx.getParameter(ext.UNMASKED_RENDERER_WEBGL)
+                   : GLctx.getParameter(GLctx.RENDERER);
+    } catch (e) {
+        name = "unknown (" + e + ")";
+    }
+    return stringToNewUTF8(String(name));
+});
+#endif
+
+static const char *gpu_renderer_name(void)
+{
+    static char name[256];
+    if (!name[0]) {
+#ifdef __EMSCRIPTEN__
+        char *s = bench_js_gpu_renderer();
+        snprintf(name, sizeof(name), "%s", s ? s : "unknown");
+        free(s);
+#else
+        const GLubyte *s = glGetString(GL_RENDERER);
+        snprintf(name, sizeof(name), "%s", s ? (const char*)s : "unknown");
+#endif
+    }
+    return name;
+}
+
 #ifdef __EMSCRIPTEN__
 /* 画面 (キャンバスの下) に表と JSON を出し、report があれば POST する。
  * window.benchResult にも JSON を置く */
@@ -218,6 +253,7 @@ static void bench_report(void)
     meta.note       = note;
     meta.stage_mask = (1u << BS_COUNT) - 1u;
     meta.cull_limit = g_cfg.cull_limit;
+    meta.gpu_renderer = gpu_renderer_name();
 
     char *json = bench_data_json(g_b.data, &meta);
     char *md   = bench_data_markdown(g_b.data, &meta);

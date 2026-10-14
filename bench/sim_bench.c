@@ -141,6 +141,7 @@ int main(int argc, char **argv)
     meta.width      = BENCH_W;
     meta.height     = BENCH_H;
     meta.gpu_timer  = 0;
+    meta.gpu_renderer = NULL;
     meta.note       = "sim_bench: ps_update + ps_pack_gpu のみ (描画なし)。frame = update + pack、fps はその処理能力";
     meta.cull_limit = g_cull.limit;
     meta.stage_mask = BENCH_STAGE_BIT(BS_UPDATE) | BENCH_STAGE_BIT(BS_PACK)

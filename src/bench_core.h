@@ -90,6 +90,8 @@ typedef struct {
     const char *note;        /* 補足 (NULL 可)                          */
     unsigned    stage_mask;  /* 出力する段階 (BENCH_STAGE_BIT の OR)     */
     int         cull_limit;  /* 飽和カリングの上限 (0 = 無効)            */
+    const char *gpu_renderer; /* GPU の名前 (NULL 可)。ブラウザでは WebGL の
+                               * UNMASKED_RENDERER。SwiftShader ならソフトウェア描画 */
 } BenchMeta;
 
 BenchData *bench_data_new(int runs);
