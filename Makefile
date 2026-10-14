@@ -178,8 +178,14 @@ EMCXX   := em++
 WASMDIR := $(OBJDIR)/wasm
 WASM_TARGET := bin/index.html
 
+# 最適化: -O3、-msimd128 で WebAssembly SIMD (128bit、f32x4) による自動ベクトル化を許し、
+# -flto でファイルをまたいだ最適化をする。ネイティブのフラグは変えない。
+# -ffast-math は付けない: 速さの差は数 % だが、丸めが変わってベンチのチェックサムが
+# before とビット単位で一致しなくなり、変更の検証が甘くなるため (bench/PLAN.md)
+WASM_OPT := -O3 -msimd128 -flto
+
 WASM_COMMON := \
-    -O2 \
+    $(WASM_OPT) \
     -DIMGUI_IMPL_OPENGL_ES3 \
     -sUSE_SDL=2 \
     -I$(SRCDIR) -I$(THIRDDIR) -I$(IMGDIR)
@@ -190,9 +196,10 @@ WASM_CXXFLAGS := $(WASM_COMMON) -std=c++17
 # web/shell.html を元に bin/index.html を作る(キャンバスを画面いっぱいにするページ)
 WASM_SHELL := web/shell.html
 
-# リンク時にも -O2 が要る(無いとデバッグ版のシステムライブラリが使われ、JS も縮小されない)
+# リンク時にも最適化フラグが要る(無いとデバッグ版のシステムライブラリが使われ、JS も縮小されない)。
+# -flto ではコード生成がリンク時に行われるので、-msimd128 もここに要る
 WASM_LDFLAGS := \
-    -O2 \
+    $(WASM_OPT) \
     -sUSE_SDL=2 \
     -sUSE_WEBGL2=1 \
     -sFULL_ES3=1 \
@@ -249,6 +256,10 @@ $(WASMDIR)/im_opengl3.o: $(IMGDIR)/imgui_impl_opengl3.cpp | $(WASMDIR)
 	$(EMCXX) $(WASM_CXXFLAGS) -c -o $@ $<
 
 $(WASMDIR)/bench.o: $(BUILD_INFO)
+
+# フラグ (WASM_OPT など) を変えたら作り直す。make はフラグの変化を見ないので、
+# これが無いと古いフラグのオブジェクトがそのまま LTO でリンクされる
+$(WASM_ALL_OBJS): Makefile
 
 $(WASMDIR):
 	mkdir -p $(WASMDIR)
