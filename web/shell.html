@@ -1,0 +1,114 @@
+<!doctype html>
+<!--
+  Emscripten のシェル(--shell-file)。make wasm でこのファイルを元に bin/index.html が生成される。
+  {{{ SCRIPT }}} の位置に Emscripten が index.js の読み込みを差し込む。
+  キャンバスは画面いっぱいに広げる。SDL2 は CSS で決まった大きさに合わせてキャンバスの解像度を変えるので、
+  ブラウザの大きさを変えると粒子の描画領域も追従する。
+-->
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Particle Flow</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      color: #ddd;
+      font-family: system-ui, -apple-system, "Helvetica Neue", sans-serif;
+    }
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      outline: none;
+      /* タッチでのスクロールやピンチをブラウザに取られないようにする */
+      touch-action: none;
+    }
+    /* 読み込み中の表示。Module が起動したら消す */
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #000;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      transition: opacity 0.4s;
+    }
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #loading-bar {
+      width: 200px;
+      height: 2px;
+      background: #333;
+    }
+    #loading-bar > div {
+      height: 100%;
+      width: 0;
+      background: #ddd;
+      transition: width 0.2s;
+    }
+    #hint {
+      position: fixed;
+      left: 12px;
+      bottom: 10px;
+      font-size: 12px;
+      color: #888;
+      pointer-events: none;
+      user-select: none;
+    }
+    #hint a {
+      color: #aaa;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+  <div id="loading">
+    <div>Loading Particle Flow</div>
+    <div id="loading-bar"><div id="loading-progress"></div></div>
+    <div id="loading-status"></div>
+  </div>
+  <div id="hint">
+    左クリック: 引力 / 右クリック: 斥力 / E: 爆発 / V: 渦 / B: 波紋 / T: 時間停止 / R: リセット / Tab: 設定 ・
+    <a href="../">紹介サイトへ</a>
+  </div>
+  <script>
+    var loadingEl = document.getElementById('loading');
+    var progressEl = document.getElementById('loading-progress');
+    var statusEl = document.getElementById('loading-status');
+
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      // Emscripten が「Downloading data... (12/345)」のような進捗を渡してくる
+      setStatus: function (text) {
+        var m = text.match(/\((\d+(?:\.\d+)?)\/(\d+)\)/);
+        if (m) progressEl.style.width = (100 * m[1] / m[2]) + '%';
+        statusEl.textContent = text.replace(/\(.*\)/, '').trim();
+      },
+      // メインループが始まったら読み込み表示を消す
+      onRuntimeInitialized: function () {
+        progressEl.style.width = '100%';
+        setTimeout(function () { loadingEl.classList.add('hidden'); }, 200);
+        Module.canvas.focus();
+      },
+      printErr: function (text) {
+        console.error(text);
+      }
+    };
+
+    // クリックでキャンバスにフォーカスを戻す(キー操作を受けるため)
+    Module.canvas.addEventListener('mousedown', function () { Module.canvas.focus(); });
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>

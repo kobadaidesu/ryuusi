@@ -1,6 +1,7 @@
 /* ---- i18n ---- */
 const i18n = {
   ja: {
+    'play-button': 'ブラウザで遊ぶ',
     'about-heading': 'マウスとキーボードで<br />粒子をリアルタイムに操作',
     'about-desc': '最大30万個の粒子が生み出す視覚的な変化を楽しめるインタラクティブビジュアル作品です。',
     'fun-heading': '予測しきれない<br />動きと模様',
@@ -39,6 +40,7 @@ const i18n = {
     'footer-rights': '© 2026 Particle Flow', 'footer-tagline': 'Designed with intention',
   },
   en: {
+    'play-button': 'Play in your browser',
     'about-heading': 'Manipulate particles<br />in real time with mouse and keyboard',
     'about-desc': 'An interactive visual art piece where you can enjoy visual changes created by up to 300,000 particles.',
     'fun-heading': 'Unpredictable<br />movements and patterns',
@@ -77,6 +79,7 @@ const i18n = {
     'footer-rights': '© 2026 Particle Flow', 'footer-tagline': 'Designed with intention',
   },
   zh: {
+    'play-button': '在浏览器中体验',
     'about-heading': '用鼠标和键盘<br />实时操控粒子',
     'about-desc': '这是一个交互式视觉艺术作品，您可以欣赏多达30万个粒子带来的视觉变化。',
     'fun-heading': '难以预测的<br />动态与图案',
@@ -115,6 +118,7 @@ const i18n = {
     'footer-rights': '© 2026 Particle Flow', 'footer-tagline': 'Designed with intention',
   },
   ko: {
+    'play-button': '브라우저에서 플레이',
     'about-heading': '마우스와 키보드로<br />파티클을 실시간 조작',
     'about-desc': '최대 30만 개의 파티클이 만들어내는 시각적 변화를 즐길 수 있는 인터랙티브 비주얼 작품입니다.',
     'fun-heading': '예측할 수 없는<br />움직임과 패턴',
