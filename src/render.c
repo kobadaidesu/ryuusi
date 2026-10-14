@@ -1,7 +1,10 @@
 /*  render.c  –  SDL2 + OpenGL 3.3 Core パーティクル一括描画
  *
  *  設計ポイント:
- *  - 頂点 1 つ = (x, y, r, g, b, a) の 6 float (24 bytes) インターリーブ
+ *  - 色 (RGBA8、4 bytes) は粒子ごとに決まっていて毎フレームは変わらないので、
+ *    静的な VBO に置き、ParticleSystem.color_version が変わったときだけ送り直す
+ *  - 毎フレーム送るのは位置だけ。位置の VBO は 2 本を交互に使い、GPU が前のフレームで
+ *    まだ読んでいるバッファへの glBufferSubData で待たされないようにする
  *  - VBO は起動時に MAX_PARTICLES 分をあらかじめ確保 (glBufferData NULL)
  *    毎フレームは glBufferSubData だけで済む (リアロケなし)
  *  - 加算合成 (GL_ONE, GL_ONE) で発光感を演出
@@ -74,12 +77,23 @@ static const char *FRAG_SRC =
 struct Renderer {
     GLuint prog;        /* パーティクル シェーダプログラム */
     GLuint vao;
-    GLuint vbo;
     GLint  u_resolution;
     GLint  u_point_size;
-    GpuVertex *staging; /* CPU ステージングバッファ */
 
-    /* 飽和カリング (ps_pack_gpu)。ウィンドウと同じ大きさの画素ごとのカウント */
+    /* 色: 粒子の番号順の RGBA8。color_seen と ps->color_version が違えば送り直す */
+    GLuint   color_vbo;
+    unsigned color_seen;
+
+    /* 毎フレームの転送先 (2 本を交互に使う)。位置 (x, y の組) を描く粒子の分だけ詰めて送る。
+     * 飽和カリングで間引いたフレームは、位置と色の並びを合わせるため色も詰めて送る
+     * (間引かなかったフレームは静的な color_vbo をそのまま使う) */
+    int    frame_parity;
+    GLuint pos_vbo[2];
+    GLuint col_dyn_vbo[2];
+    float   *pos_staging;
+    uint8_t (*col_staging)[4];
+
+    /* 飽和カリング。ウィンドウと同じ大きさの画素ごとのカウント */
     PackCull cull;
 
     int win_w, win_h;
@@ -158,6 +172,17 @@ static void cull_alloc(Renderer *r, int w, int h)
     r->cull.h = h;
 }
 
+/* size バイトのバッファを予約する (中身は未定義) */
+static GLuint make_buffer(GLenum target, size_t size, GLenum usage)
+{
+    GLuint b;
+    glGenBuffers(1, &b);
+    glBindBuffer(target, b);
+    glBufferData(target, (GLsizeiptr)size, NULL, usage);
+    glBindBuffer(target, 0);
+    return b;
+}
+
 /* ------------------------------------------------------------------ */
 /*  render_init                                                         */
 /* ------------------------------------------------------------------ */
@@ -185,37 +210,28 @@ Renderer *render_init(int win_w, int win_h)
     r->u_resolution = glGetUniformLocation(r->prog, "u_resolution");
     r->u_point_size = glGetUniformLocation(r->prog, "u_point_size");
 
-    /* ---- VAO / VBO ---- */
+    /* ---- VAO / VBO (属性の向き先は毎フレーム決める) ---- */
     glGenVertexArrays(1, &r->vao);
-    glGenBuffers(1, &r->vbo);
-
     glBindVertexArray(r->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, r->vbo);
-
-    /* MAX_PARTICLES 分のバッファをあらかじめ確保 (data=NULL → 予約のみ) */
-    glBufferData(GL_ARRAY_BUFFER,
-                 (GLsizeiptr)(MAX_PARTICLES * sizeof(GpuVertex)),
-                 NULL,
-                 GL_DYNAMIC_DRAW);
-
-    /* attribute 0: vec2 position (offset 0) */
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(GpuVertex),
-                          (void*)offsetof(GpuVertex, x));
-
-    /* attribute 1: vec4 color (offset 8 bytes) */
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
-                          sizeof(GpuVertex),
-                          (void*)offsetof(GpuVertex, r));
-
+    glEnableVertexAttribArray(0);   /* a_pos   */
+    glEnableVertexAttribArray(1);   /* a_color */
     glBindVertexArray(0);
 
+    /* MAX_PARTICLES 分のバッファをあらかじめ確保 (data=NULL → 予約のみ) */
+    r->color_vbo  = make_buffer(GL_ARRAY_BUFFER, MAX_PARTICLES * 4, GL_STATIC_DRAW);
+    r->color_seen = ~0u;
+    for (int k = 0; k < 2; k++) {
+        r->pos_vbo[k]     = make_buffer(GL_ARRAY_BUFFER, MAX_PARTICLES * 8, GL_DYNAMIC_DRAW);
+        r->col_dyn_vbo[k] = make_buffer(GL_ARRAY_BUFFER, MAX_PARTICLES * 4, GL_DYNAMIC_DRAW);
+    }
+
     /* ---- ステージングバッファ ---- */
-    r->staging = (GpuVertex*)malloc(MAX_PARTICLES * sizeof(GpuVertex));
-    if (!r->staging) {
+    r->pos_staging = (float*)malloc((size_t)MAX_PARTICLES * 2 * sizeof(float));
+    r->col_staging = (uint8_t(*)[4])malloc((size_t)MAX_PARTICLES * 4);
+    if (!r->pos_staging || !r->col_staging) {
         fprintf(stderr, "[render] staging malloc failed\n");
+        free(r->pos_staging);
+        free(r->col_staging);
         free(r);
         return NULL;
     }
@@ -265,15 +281,30 @@ void render_frame(Renderer *r,
 
     glClear(GL_COLOR_BUFFER_BIT);
 
-    /* ---- CPU→GPU 転送 ---- */
-    int n = ps_pack_gpu(ps, r->staging, MAX_PARTICLES, &r->cull);
+    const int n = ps->count;
+    const int k = r->frame_parity;
+    r->frame_parity ^= 1;
+
+    /* ---- CPU 側の準備 (カリングと、位置のパック) ---- */
+    int m = ps_pack_positions(ps, r->pos_staging, r->col_staging, &r->cull);
     double t1 = r->prof ? bench_now_ms() : 0.0;
 
-    glBindBuffer(GL_ARRAY_BUFFER, r->vbo);
-    /* glBufferSubData: リアロケなし、既存バッファへの部分更新 */
-    glBufferSubData(GL_ARRAY_BUFFER, 0,
-                    (GLsizeiptr)(n * sizeof(GpuVertex)),
-                    r->staging);
+    /* ---- CPU→GPU 転送 (glBufferSubData: リアロケなし、既存バッファへの部分更新) ---- */
+    /* 色は変わったときだけ (生成・再配置・色替え) */
+    if (r->color_seen != ps->color_version) {
+        glBindBuffer(GL_ARRAY_BUFFER, r->color_vbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)n * 4, ps->color);
+        r->color_seen = ps->color_version;
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, r->pos_vbo[k]);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)m * 8, r->pos_staging);
+    GLuint cbuf = r->color_vbo;
+    if (m < n) {
+        /* 間引いたので、色も描く粒子の並びに詰めたものを送る */
+        glBindBuffer(GL_ARRAY_BUFFER, r->col_dyn_vbo[k]);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)m * 4, r->col_staging);
+        cbuf = r->col_dyn_vbo[k];
+    }
     double t2 = r->prof ? bench_now_ms() : 0.0;
 
     /* ---- 描画 ---- */
@@ -281,8 +312,14 @@ void render_frame(Renderer *r,
     glUniform2f(r->u_resolution, (float)r->win_w, (float)r->win_h);
     glUniform1f(r->u_point_size, params->point_size);
 
+    /* 今回のバッファに属性を向ける (位置は x, y の組で 8 bytes、色は RGBA8 を 0..1 に正規化) */
     glBindVertexArray(r->vao);
-    glDrawArrays(GL_POINTS, 0, n);       /* 1回の API コールで全粒子描画 */
+    glBindBuffer(GL_ARRAY_BUFFER, r->pos_vbo[k]);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 8, (void*)0);
+    glBindBuffer(GL_ARRAY_BUFFER, cbuf);
+    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, 4, (void*)0);
+
+    glDrawArrays(GL_POINTS, 0, m);       /* 1回の API コールで全粒子描画 */
     glBindVertexArray(0);
 
     if (r->prof) {
@@ -323,10 +360,13 @@ void render_shutdown(Renderer *r)
 {
     if (!r) return;
     glDeleteVertexArrays(1, &r->vao);
-    glDeleteBuffers(1, &r->vbo);
+    glDeleteBuffers(1, &r->color_vbo);
+    glDeleteBuffers(2, r->pos_vbo);
+    glDeleteBuffers(2, r->col_dyn_vbo);
     glDeleteProgram(r->prog);
     if (r->prof_gpu) glDeleteQueries(PROF_QUERIES, r->prof_q);
-    free(r->staging);
+    free(r->pos_staging);
+    free(r->col_staging);
     free(r->cull.counts);
     free(r);
 }

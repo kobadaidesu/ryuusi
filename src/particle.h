@@ -55,6 +55,11 @@ typedef struct {
     /* --- 基本色相 (0..1、粒子ごとに固有) --- */
     float hue[MAX_PARTICLES];
 
+    /* --- 描画色 (RGBA8)。色相と寿命から作り、生成・再配置・色替えのときだけ更新する。
+     *     描画側は color_version が変わったときだけ GPU に送り直す --- */
+    uint8_t  color[MAX_PARTICLES][4];
+    unsigned color_version;
+
     /* --- 質量の逆数 (速度応答の係数)。質量は 0.5〜2 で、力 / 質量 を掛け算にするため逆数で持つ --- */
     float inv_mass[MAX_PARTICLES];
 
@@ -66,15 +71,6 @@ typedef struct {
     int win_h;
 
 } ParticleSystem;
-
-/* ------------------------------------------------------------------ *
- *  GPU 転送用パックド頂点
- *  粒子1つ = 6 float = 24 bytes
- * ------------------------------------------------------------------ */
-typedef struct {
-    float x, y;
-    float r, g, b, a;
-} GpuVertex;
 
 /* ------------------------------------------------------------------ *
  *  API
@@ -112,12 +108,14 @@ typedef struct {
     int       limit;   /* 0 以下で無効 (全部描く) */
 } PackCull;
 
-/* GPU バッファへパック (render.c から呼ぶ)。cull が NULL なら全部描く。
- * 戻り値: 書き込んだ頂点数 (カリングした分だけ ps->count より少ない) */
-int  ps_pack_gpu(const ParticleSystem *ps,
-                 GpuVertex *out,         /* MAX_PARTICLES 確保済み前提 */
-                 int max_out,
-                 const PackCull *cull);
+/* 描画用のパック (render.c から呼ぶ)。色は ps->color にあるので、毎フレーム作るのは位置だけ。
+ * 描く粒子の位置 (float x, y の組) を pos に詰めて書く。
+ * カリングで間引いたときは、位置と色の並びを合わせるため、色も col に詰めて書く
+ * (間引かなかったときは col に書かない。ps->color をそのまま使える)。
+ * 戻り値は描く粒子の数。ps->count と同じなら何も間引いていない。
+ * cull が NULL か無効なら間引かない */
+int ps_pack_positions(const ParticleSystem *ps, float *pos, uint8_t (*col)[4],
+                      const PackCull *cull);
 
 
 #endif /* PARTICLE_H */

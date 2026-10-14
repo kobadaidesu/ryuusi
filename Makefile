@@ -190,8 +190,11 @@ WASM_COMMON := \
     -sUSE_SDL=2 \
     -I$(SRCDIR) -I$(THIRDDIR) -I$(IMGDIR)
 
-WASM_CFLAGS   := $(WASM_COMMON) -std=c99 -I$(OBJDIR)
-WASM_CXXFLAGS := $(WASM_COMMON) -std=c++17
+# -MMD -MP: ヘッダーの依存を .d に書き出す (ネイティブと同じ)。これが無いと、
+# particle.h の構造体を変えても app.o などが作り直されず、大きさの違う構造体のまま
+# リンクされて実行時にメモリ範囲外アクセスになる
+WASM_CFLAGS   := $(WASM_COMMON) -std=c99 -I$(OBJDIR) -MMD -MP
+WASM_CXXFLAGS := $(WASM_COMMON) -std=c++17 -MMD -MP
 
 # web/shell.html を元に bin/index.html を作る(キャンバスを画面いっぱいにするページ)
 WASM_SHELL := web/shell.html
@@ -223,6 +226,7 @@ WASM_IMGUI_OBJS := \
     $(WASMDIR)/im_opengl3.o
 
 WASM_ALL_OBJS := $(WASM_C_OBJS) $(WASMDIR)/gui.o $(WASM_IMGUI_OBJS)
+-include $(WASM_ALL_OBJS:.o=.d)
 
 .PHONY: wasm wasm-clean
 
