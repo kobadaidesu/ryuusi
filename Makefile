@@ -14,6 +14,8 @@
 
 CC      := gcc
 CXX     := g++
+UNAME_S := $(shell uname -s)
+.DEFAULT_GOAL := all
 TARGET  := bin/particle_flow
 SRCDIR  := src
 OBJDIR  := obj
@@ -42,6 +44,12 @@ endif
 CFLAGS   := $(COMMON_FLAGS) -std=c99   $(PKG_CFLAGS) -MMD -MP
 CXXFLAGS := $(COMMON_FLAGS) -std=c++17 $(PKG_CFLAGS) -I$(SRCDIR) -I$(THIRDDIR) -I$(IMGDIR) -MMD -MP
 LIBS     := $(PKG_LIBS) -lm
+
+# macOS では OpenGL はライブラリではなく framework としてリンクする。
+# Homebrew の glew.pc にはこの指定が含まれないため、明示的に追加する。
+ifeq ($(UNAME_S),Darwin)
+    LIBS += -framework OpenGL
+endif
 
 ifeq ($(OS),Windows_NT)
     LIBS   := -lSDL2 -lSDL2main -lGLEW32 -lopengl32 -lm
@@ -140,13 +148,17 @@ WASM_COMMON := \
 WASM_CFLAGS   := $(WASM_COMMON) -std=c99
 WASM_CXXFLAGS := $(WASM_COMMON) -std=c++17
 
+# web/shell.html を元に bin/index.html を作る(キャンバスを画面いっぱいにするページ)
+WASM_SHELL := web/shell.html
+
 WASM_LDFLAGS := \
     -sUSE_SDL=2 \
     -sUSE_WEBGL2=1 \
     -sFULL_ES3=1 \
     -sWASM=1 \
     -sALLOW_MEMORY_GROWTH=1 \
-    -sINITIAL_MEMORY=67108864
+    -sINITIAL_MEMORY=67108864 \
+    --shell-file $(WASM_SHELL)
 
 WASM_C_SRCS  := $(wildcard $(SRCDIR)/*.c)
 WASM_C_OBJS  := $(patsubst $(SRCDIR)/%.c, $(WASMDIR)/%.o, $(WASM_C_SRCS))
@@ -165,8 +177,8 @@ WASM_ALL_OBJS := $(WASM_C_OBJS) $(WASMDIR)/gui.o $(WASM_IMGUI_OBJS)
 
 wasm: $(WASM_TARGET)
 
-$(WASM_TARGET): $(WASM_ALL_OBJS) | bin
-	$(EMCXX) -o $@ $^ $(WASM_LDFLAGS)
+$(WASM_TARGET): $(WASM_ALL_OBJS) $(WASM_SHELL) | bin
+	$(EMCXX) -o $@ $(WASM_ALL_OBJS) $(WASM_LDFLAGS)
 
 $(WASMDIR)/%.o: $(SRCDIR)/%.c | $(WASMDIR)
 	$(EMCC) $(WASM_CFLAGS) -c -o $@ $<

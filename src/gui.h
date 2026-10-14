@@ -12,10 +12,9 @@ extern "C" {
 #endif
 
 struct SDL_Window;
-typedef void *SDL_GLContext;
 
 /* ImGui 初期化 (SDL_GL_CreateContext 後に呼ぶ) */
-void gui_init(struct SDL_Window *window, SDL_GLContext gl_ctx);
+void gui_init(struct SDL_Window *window, void *gl_ctx);
 
 /* フレーム開始 (SDL イベント処理前に呼ぶ) */
 void gui_new_frame(void);

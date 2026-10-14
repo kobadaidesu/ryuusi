@@ -182,10 +182,18 @@ int gui_render(SimParams *p, int hud_visible, int params_visible,
 
     /* ---- HUD オーバーレイ (P キー) ---- */
     if (hud_visible) {
+#ifdef __EMSCRIPTEN__
+        /* ブラウザ版は日本語フォントを積んでいない(フォントを配ると数MB増える)ので英語で出す */
+        static const char *mode_names[] = {
+            "None", "Attract", "Repel", "Explode", "Vortex", "Spawn", "Time stop"
+        };
+        const char *mname = (mode >= 0 && mode <= 6) ? mode_names[mode] : "?";
+#else
         static const char *mode_jp[] = {
             "なし", "引力", "斥力", "爆発", "渦", "生成", "タイムストップ"
         };
         const char *mname = (mode >= 0 && mode <= 6) ? mode_jp[mode] : "?";
+#endif
         ImGuiIO &hio = ImGui::GetIO();
         ImGui::SetNextWindowPos(ImVec2(hio.DisplaySize.x * 0.5f, 8.0f),
                                 ImGuiCond_Always, ImVec2(0.5f, 0.0f));
@@ -195,10 +203,17 @@ int gui_render(SimParams *p, int hud_visible, int params_visible,
             ImGuiWindowFlags_NoNav         | ImGuiWindowFlags_NoMove     |
             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_NoFocusOnAppearing);
+#ifdef __EMSCRIPTEN__
+        if (timestop_on)
+            ImGui::Text("%d pts  %.0f FPS  Mode: %s + Time stop", count, fps, mname);
+        else
+            ImGui::Text("%d pts  %.0f FPS  Mode: %s", count, fps, mname);
+#else
         if (timestop_on)
             ImGui::Text("%d粒子  %.0f FPS  モード: %s + タイムストップ", count, fps, mname);
         else
             ImGui::Text("%d粒子  %.0f FPS  モード: %s", count, fps, mname);
+#endif
         ImGui::End();
     }
 
