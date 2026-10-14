@@ -91,6 +91,8 @@ void ps_update(ParticleSystem *ps,
                int   ripple_count,
                const SimParams *params);       /* 実行時パラメータ           */
 void ps_reset(ParticleSystem *ps, const SimParams *params);
+/* 乱数の種を設定 (ベンチマークで初期配置を毎回同じにするため) */
+void ps_seed(uint32_t seed);
 /* 位置・速度はそのままで色相だけ一括更新 */
 void ps_recolor(ParticleSystem *ps, const SimParams *params);
 

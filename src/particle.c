@@ -21,6 +21,11 @@ static inline float frand_range(float lo, float hi)
     return lo + frand() * (hi - lo);
 }
 
+void ps_seed(uint32_t seed)
+{
+    g_seed = seed ? seed : 12345678u; /* xorshift は 0 から抜けられない */
+}
+
 /* HSV -> RGB (h:0..1, s:0..1, v:0..1) */
 static inline void hsv2rgb(float h, float s, float v,
                             float *r, float *g, float *b)
